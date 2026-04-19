@@ -1,0 +1,242 @@
+<!-- Dashboard Edit Form -->
+<div class="dashboard-form-container">
+    <div class="form-header">
+        <h3>उजुरी सम्पादन फारम</h3>
+    </div>
+    
+    <form id="dashboardEditForm" class="dashboard-form">
+        <div class="form-row">
+            <div class="form-group">
+                <label for="editRegNo">दर्ता नं *</label>
+                <input type="text" id="editRegNo" class="form-control" placeholder="उजुरी दर्ता नम्बर" required />
+            </div>
+            
+            <div class="form-group">
+                <label for="editDate">दर्ता मिति *</label>
+                <input type="text" id="editDate" class="form-control nepali-datepicker-input" placeholder="मिति छान्नुहोस्" readonly required />
+            </div>
+            
+            <div class="form-group">
+                <label for="editComplainant">उजुरकर्ताको नाम *</label>
+                <input type="text" id="editComplainant" class="form-control" placeholder="उजुरी गर्ने व्यक्तिको नाम" required />
+            </div>
+            
+            <div class="form-group">
+                <label for="editAccused">विपक्षी</label>
+                <input type="text" id="editAccused" class="form-control" placeholder="विपक्षीको नाम" />
+            </div>
+        </div>
+        
+        <div class="form-row">
+            <div class="form-group full-width">
+                <label for="editDescription">उजुरीको संक्षिप्त विवरण</label>
+                <textarea id="editDescription" class="form-control" rows="4" placeholder="उजुरीको संक्षिप्त विवरण"></textarea>
+            </div>
+        </div>
+        
+        <div class="form-row">
+            <!-- (a) अनलाइन उजुरी सम्पादन -->
+            <div class="form-group">
+                <label for="editSource">उजुरीको माध्यम</label>
+                <select id="editSource" class="form-control">
+                    <option value="">छान्नुहोस्</option>
+                    <option value="शाखा">शाखा</option>
+                    <option value="हेलो सरकार">हेलो सरकार</option>
+                    <option value="अनलाइन">अनलाइन</option>
+                    <option value="फोन">फोन</option>
+                    <option value="अन्य">अन्य</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label for="editShakha">सम्बन्धित शाखा</label>
+                <select id="editShakha" class="form-control">
+                    <option value="">छान्नुहोस्</option>
+                    <!-- Shakhas will be loaded dynamically -->
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label for="editMahashakha">महाशाखा</label>
+                <select id="editMahashakha" class="form-control">
+                    <option value="">छान्नुहोस्</option>
+                    <!-- Mahashakhas will be loaded dynamically -->
+                </select>
+            </div>
+        </div>
+        
+        <div class="form-row">
+            <!-- (b) अनलाइन उजुरी सम्पादन -->
+            <div class="form-group">
+                <label for="editProvince">प्रदेश</label>
+                <select id="editProvince" class="form-control">
+                    <option value="">छान्नुहोस्</option>
+                    <option value="कोशी">कोशी प्रदेश</option>
+                    <option value="मधेस">मधेस प्रदेश</option>
+                    <option value="बागमती">बागमती प्रदेश</option>
+                    <option value="गण्डकी">गण्डकी प्रदेश</option>
+                    <option value="लुम्बिनी">लुम्बिनी प्रदेश</option>
+                    <option value="कर्णाली">कर्णाली प्रदेश</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label for="editDistrict">जिल्ला</label>
+                <select id="editDistrict" class="form-control">
+                    <option value="">छान्नुहोस्</option>
+                    <!-- Districts will be loaded dynamically -->
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label for="editLocalLevel">स्थानीय तह</label>
+                <select id="editLocalLevel" class="form-control">
+                    <option value="">छान्नुहोस्</option>
+                    <option value="गाउँपालिका">गाउँपालिका</option>
+                    <option value="नगरपालिका">नगरपालिका</option>
+                    <option value="गाउँसम्पादन">गाउँसम्पादन</option>
+                    <option value="महानगर">महानगर</option>
+                </select>
+            </div>
+            
+        </div>
+        
+        <div class="form-row">
+            <!-- (c) अनलाइन उजुरी सम्पादन -->
+            <div class="form-group">
+                <label for="editOnlineSource">उजुरीको माध्यम</label>
+                <select id="editOnlineSource" class="form-control">
+                    <option value="">छान्नुहोस्</option>
+                    <option value="वेबसाइट">वेबसाइट</option>
+                    <option value="इमेल">इमेल</option>
+                    <option value="फोन">फोन</option>
+                    <option value="अन्य">अन्य</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label for="editProvinceOnline">प्रदेश</label>
+                <select id="editProvinceOnline" class="form-control">
+                    <option value="">छान्नुहोस्</option>
+                    <option value="कोशी">कोशी प्रदेश</option>
+                    <option value="मधेस">मधेस प्रदेश</option>
+                    <option value="बागमती">बागमती प्रदेश</option>
+                    <option value="गण्डकी">गण्डकी प्रदेश</option>
+                    <option value="लुम्बिनी">लुम्बिनी प्रदेश</option>
+                    <option value="कर्णाली">कर्णाली प्रदेश</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label for="editDistrictOnline">जिल्ला</label>
+                <select id="editDistrictOnline" class="form-control">
+                    <option value="">छान्नुहोस्</option>
+                    <!-- Districts will be loaded dynamically -->
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label for="editLocalLevelOnline">स्थानीय तह</label>
+                <select id="editLocalLevelOnline" class="form-control">
+                    <option value="">छान्नुहोस्</option>
+                    <option value="गाउँपालिका">गाउँपालिका</option>
+                    <option value="नगरपालिका">नगरपालिका</option>
+                    <option value="गाउँसम्पादन">गाउँसम्पादन</option>
+                    <option value="महानगर">महानगर</option>
+                </select>
+            </div>
+        </div>
+        
+        <div class="form-actions">
+            <button type="button" class="btn btn-primary" onclick="(window.NVC&&NVC.UI&&typeof NVC.UI.saveDashboardEdit==='function')?NVC.UI.saveDashboardEdit():saveDashboardEdit()">
+                <i class="fas fa-save"></i> सुरक्ष गर्नुहोस्
+            </button>
+            <button type="button" class="btn btn-secondary" onclick="(window.NVC&&NVC.UI&&typeof NVC.UI.cancelDashboardEdit==='function')?NVC.UI.cancelDashboardEdit():cancelDashboardEdit()">
+                <i class="fas fa-times"></i> रद्द गर्नुहोस्
+            </button>
+        </div>
+    </form>
+</div>
+
+<style>
+.dashboard-form-container {
+    max-width: 800px;
+    margin: 20px auto;
+    padding: 20px;
+    background: var(--card-bg);
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+}
+
+.form-header {
+    text-align: center;
+    margin-bottom: 25px;
+    padding-bottom: 15px;
+    border-bottom: 2px solid var(--border-color);
+}
+
+.form-header h3 {
+    color: var(--text-color);
+    margin: 0;
+}
+
+.dashboard-form {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.form-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 15px;
+}
+
+.form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.form-group.full-width {
+    grid-column: 1 / -1;
+}
+
+.form-group label {
+    font-weight: 500;
+    color: var(--text-color);
+    margin-bottom: 5px;
+}
+
+.form-control {
+    padding: 10px;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    background: var(--bg-color);
+    color: var(--text-color);
+    font-size: 14px;
+}
+
+.form-actions {
+    display: flex;
+    gap: 10px;
+    justify-content: flex-end;
+    margin-top: 20px;
+    padding-top: 20px;
+    border-top: 1px solid var(--border-color);
+}
+
+@media (max-width: 768px) {
+    .form-row {
+        grid-template-columns: 1fr;
+    }
+    
+    .form-actions {
+        flex-direction: column;
+    }
+    
+    .form-actions button {
+        width: 100%;
+    }
+}
+</style>

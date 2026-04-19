@@ -1,0 +1,956 @@
+<!DOCTYPE html>
+<html lang="ne">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
+    <!-- Cache control for better performance -->
+    <meta http-equiv="Cache-Control" content="max-age=31536000, public">
+    <title>राष्ट्रिय सतर्कता केन्द्र - उजुरी व्यवस्थापन</title>
+    <!-- PWA Manifest and Theme Color -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#133f81">
+    <link rel="apple-touch-icon" href="emblem.webp">
+    <!-- Critical CSS inlined for faster render -->
+    <style>
+      /* Critical styles for above-the-fold content */
+      body{margin:0;padding:0;font-family:'Segoe UI','Kalimati','Noto Sans Devanagari',sans-serif;background:#f5f9ff;color:#1e293b;line-height:1.25;min-height:100vh}
+      .hidden{display:none!important}
+      .page{min-height:100vh;display:flex;flex-direction:column}
+      .main-header{background:#133f81;color:white;padding:1rem}
+      .logo-container{display:flex;align-items:center;gap:1rem}
+      .logo{width:40px;height:40px}
+      .hero-section{background:transparent;color:white;padding:2rem;margin-bottom:1rem}
+      .hero-title{font-size:1.5rem;font-weight:700;margin-bottom:0.5rem}
+      .hero-subtitle{font-size:1rem;opacity:0.9}
+      .d-flex{display:flex}
+      .align-center{align-items:center}
+      .justify-between{justify-content:space-between}
+      .gap-3{gap:0.75rem}
+      .text-small{font-size:0.8125rem}
+      .text-xs{font-size:0.75rem}
+      .text-muted{opacity:0.7}
+      .mb-1{margin-bottom:0.25rem}
+      .dashboard-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:1rem;padding:0 1rem}
+      .module-card{background:white;border-radius:8px;padding:1.5rem;box-shadow:0 2px 4px rgba(0,0,0,0.08);text-decoration:none;color:inherit;transition:transform 0.16s ease}
+      .module-card:hover{transform:translateY(-2px)}
+      .module-icon{font-size:2rem;margin-bottom:1rem;color:#133f81}
+      .quick-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:1rem}
+      .stat-card{background:rgba(255,255,255,0.1);border-radius:8px;padding:1rem;text-align:center}
+      .stat-value{font-size:1.5rem;font-weight:700;margin-bottom:0.25rem}
+      .stat-label{font-size:0.875rem;opacity:0.9}
+      :root{--primary:#133f81;--primary-light:#1e88e5;--gray-700:#495057}
+    </style>
+    
+    <!-- Defer non-critical CSS -->
+    <link rel="preload" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
+    <noscript><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"></noscript>
+    
+    <!-- Google Fonts with font-display: swap -->
+    <link rel="preload" href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&family=Preahvihear&display=swap" as="style" onload="this.onload=null;this.rel='stylesheet'">
+    <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&family=Preahvihear&display=swap"></noscript>
+    
+    <!-- Defer Bootstrap CSS -->
+    <link rel="preload" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
+    <noscript><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"></noscript>
+    
+    <!-- Defer other CSS -->
+    <link rel="preload" href="https://unpkg.com/nepali-date-picker@2.0.2/dist/nepaliDatePicker.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
+    <noscript><link rel="stylesheet" href="https://unpkg.com/nepali-date-picker@2.0.2/dist/nepaliDatePicker.min.css"></noscript>
+    
+    <link rel="preload" href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
+    <noscript><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css"></noscript>
+    
+    <link rel="preload" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
+    <noscript><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.min.css"></noscript>
+    
+    <!-- Defer main CSS -->
+    <link rel="preload" href="style.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
+    <noscript><link rel="stylesheet" href="style.css"></noscript>
+    <style>
+        /* Dark Mode Variables */
+        body.dark-mode {
+            --bg-color: #1a1a2e;
+            --text-color: #e0e0e0;
+            --card-bg: #16213e;
+            --sidebar-bg: #0f3460;
+            --border-color: #2a2a40;
+        }
+        body.dark-mode {
+            background-color: var(--bg-color) !important;
+            color: var(--text-color) !important;
+        }
+        body.dark-mode .card, 
+        body.dark-mode .module-card,
+        body.dark-mode .modal-content,
+        body.dark-mode .login-card {
+            background-color: var(--card-bg) !important;
+            color: var(--text-color) !important;
+            border-color: var(--border-color) !important;
+        }
+        body.dark-mode .sidebar {
+            background-color: var(--sidebar-bg) !important;
+        }
+        body.dark-mode .form-control, 
+        body.dark-mode .form-select {
+            background-color: #252a41;
+            border-color: #444;
+            color: #fff;
+        }
+        body.dark-mode .table {
+            color: #e0e0e0;
+        }
+    </style>
+    <style>
+        /* Show similar complaints one-per-line, but keep each item unwrapped; allow horizontal scroll when needed */
+        #similarComplaintsBox .alert {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+        #similarComplaintsBox .alert ul {
+            display: block;
+            padding-left: 0.85rem;
+            margin: 0;
+        }
+        #similarComplaintsBox .alert ul li {
+            display: block;
+            margin-bottom: 0.45rem;
+        }
+        /* Keep each link on a single line (no-wrap); long items will scroll horizontally inside the alert */
+        #similarComplaintsBox .alert a {
+            white-space: nowrap;
+            display: inline-block;
+        }
+    </style>
+    <style>
+        /* Ripple effect for map markers */
+        .ripple-marker {
+            position: relative;
+            border-radius: 50%;
+            border: 1px solid white;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.4);
+        }
+
+        .ripple-marker::before,
+        .ripple-marker::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            background-color: inherit;
+            transform: translate(-50%, -50%);
+            animation: ripple 2s infinite ease-out;
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .ripple-marker::after {
+            animation-delay: 0.75s;
+        }
+
+        @keyframes ripple {
+            from { transform: translate(-50%, -50%) scale(0.8); opacity: 1; }
+            to { transform: translate(-50%, -50%) scale(4); opacity: 0; }
+        }
+
+        .ripple-marker.yellow { background-color: #ff9800; }
+        .ripple-marker.red { background-color: #d32f2f; }
+    </style>
+    <style>
+        /* Chatbot Toggler Styles */
+        .chatbot-toggler {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            z-index: 9999;
+            width: 48px;
+            height: 48px;
+            background: #007bff;
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+            cursor: grab;
+            user-select: none;
+            touch-action: none;
+        }
+        .chatbot-toggler:active { cursor: grabbing; }
+    </style>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🏛️</text></svg>">
+</head>
+<body>
+    <!-- Notice Display Modal - Shows before homepage content -->
+    <div id="noticeDisplayModal" class="modal notice-modal" style="display: none;">
+        <div class="modal-content notice-content">
+            <div class="notice-header">
+                <h3 class="notice-title">
+                    <i class="fas fa-bullhorn"></i>
+                    <span id="noticeModalTitle">महत्त्वपूर्ण सूचना</span>
+                </h3>
+                <button class="notice-close-btn" onclick="closeNoticeDisplay()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="notice-body">
+                <div id="noticeModalContent">
+                    <!-- Notice content will be loaded here -->
+                </div>
+            </div>
+            <div class="notice-footer">
+                <button class="btn btn-primary" onclick="closeNoticeDisplay()">
+                    मैले पढेँ/बुझेँ
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Page -->
+    <div id="mainPage" class="page" role="main">
+        <header class="main-header d-flex align-center justify-between" role="banner">
+            <div class="logo-container">
+                <img src="emblem.webp" 
+                     alt="नेपालको निशाना छाप" class="logo" />
+                <div>
+                    <h3 class="mb-1" style="color: var(--primary);">नेपाल सरकार<br>राष्ट्रिय सतर्कता केन्द्र</h3>
+                    <p class="text-muted text-small">उजुरी व्यवस्थापन प्रणाली</p>
+                </div>
+            </div>
+
+            <!-- AI search moved into topbar to avoid homepage clutter; kept compact to not affect other content -->
+            <div class="header-center" style="flex:1;display:flex;justify-content:center;align-items:center;">
+                <!-- placeholder to preserve layout spacing -->
+            </div>
+
+            <div class="d-flex align-center gap-3">
+                <div class="text-right">
+                    <div id="currentDateTime" class="text-small" style="color: var(--gray-700);" aria-live="polite"></div>
+                    <div class="text-xs text-muted" id="currentNepaliDate" aria-live="polite"></div>
+                </div>
+            </div>
+        </header>
+
+        <!-- AI search moved into header center to avoid layout shift on homepage -->
+
+        <!-- Advanced Filters Panel -->
+        <section class="advanced-filters-section" aria-label="Advanced Filters">
+            <div class="container">
+                <div class="advanced-filters-panel" id="advancedFilters" style="display: none;">
+                    <div class="filter-section">
+                        <div class="filter-section-title">
+                            <i class="fas fa-filter"></i>
+                            समय अवधि
+                        </div>
+                        <div class="filter-options">
+                            <div class="filter-option">
+                                <input type="radio" id="today" name="timeRange" value="today">
+                                <label for="today">आज</label>
+                            </div>
+                            <div class="filter-option">
+                                <input type="radio" id="week" name="timeRange" value="week">
+                                <label for="week">यो हप्ता</label>
+                            </div>
+                            <div class="filter-option">
+                                <input type="radio" id="month" name="timeRange" value="month">
+                                <label for="month">यो महिना</label>
+                            </div>
+                            <div class="filter-option">
+                                <input type="radio" id="year" name="timeRange" value="year">
+                                <label for="year">यो वर्ष</label>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="filter-section">
+                        <div class="filter-section-title">
+                            <i class="fas fa-exclamation-triangle"></i>
+                            गम्भीरता स्तर
+                        </div>
+                        <div class="filter-options">
+                            <div class="filter-option">
+                                <input type="checkbox" id="critical" value="critical">
+                                <label for="critical">गम्भीर</label>
+                            </div>
+                            <div class="filter-option">
+                                <input type="checkbox" id="high" value="high">
+                                <label for="high">उच्च</label>
+                            </div>
+                            <div class="filter-option">
+                                <input type="checkbox" id="medium" value="medium">
+                                <label for="medium">मध्यम</label>
+                            </div>
+                            <div class="filter-option">
+                                <input type="checkbox" id="low" value="low">
+                                <label for="low">न्यून</label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="filter-section">
+                        <div class="filter-section-title">
+                            <i class="fas fa-tags"></i>
+                            वर्गीकरण
+                        </div>
+                        <div class="filter-options">
+                            <div class="filter-option">
+                                <input type="checkbox" id="corruption" value="corruption">
+                                <label for="corruption">भ्रष्टाचार</label>
+                            </div>
+                            <div class="filter-option">
+                                <input type="checkbox" id="misconduct" value="misconduct">
+                                <label for="misconduct">विद्युतीय व्यवहार</label>
+                            </div>
+                            <div class="filter-option">
+                                <input type="checkbox" id="efficiency" value="efficiency">
+                                <label for="efficiency">अक्षमता</label>
+                            </div>
+                            <div class="filter-option">
+                                <input type="checkbox" id="other" value="other">
+                                <label for="other">अन्य</label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="filter-preset-container">
+                        <div class="filter-preset" data-preset="urgent">
+                            <i class="fas fa-fire"></i> जरुरी मुद्दाहरू
+                        </div>
+                        <div class="filter-preset" data-preset="recent">
+                            <i class="fas fa-clock"></i> भर्खरैका
+                        </div>
+                        <div class="filter-preset" data-preset="resolved">
+                            <i class="fas fa-check"></i> समाधान भएका
+                        </div>
+                        <div class="filter-preset" data-preset="pending">
+                            <i class="fas fa-hourglass-half"></i> विचाराधीन
+                        </div>
+                        <div class="filter-preset" data-preset="save">
+                            <i class="fas fa-save"></i> प्रिसेट सेभ गर्नुहोस्
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <main role="main">
+            <!-- डेभलपमेन्ट टूल - पछि हटाउन सकिन्छ -->
+        <div style="position: fixed; bottom: 10px; right: 10px; z-index: 9999;" aria-hidden="true">
+        <button onclick="testDataLoad()" style="background: #007bff; color: white; border: none; padding: 5px 10px; border-radius: 3px; margin-right: 5px;">
+            Test Load
+        </button>
+        <button onclick="checkState()" style="background: #28a745; color: white; border: none; padding: 5px 10px; border-radius: 3px;">
+            Check State
+        </button>
+        </div>
+            <section class="hero-section" aria-labelledby="hero-title">
+                <div class="hero-column-text">
+                    <h3 class="hero-title" id="hero-title">उजुरी व्यवस्थापन प्रणालीमा स्वागत छ</h3>
+                    <p class="hero-subtitle">
+                        राष्ट्रिय सतर्कता केन्द्रको एकीकृत उजुरी व्यवस्थापन प्रणाली
+                    </p>
+                </div>
+                <div class="hero-column-stats">
+                    <div class="quick-stats" role="region" aria-label="उजुरी तथ्याङ्क">
+                        <div class="stat-card" onclick="showComplaintsView({})" style="cursor:pointer" role="button" tabindex="0" aria-label="कूल उजुरीहरू हेर्नुहोस्">
+                            <div class="stat-value" id="totalComplaintsMain" aria-live="polite">0</div>
+                            <div class="stat-label">कूल उजुरीहरू</div>
+                        </div>
+                        <div class="stat-card" onclick="showComplaintsView({status:'progress'})" style="cursor:pointer" role="button" tabindex="0" aria-label="चालु उजुरीहरू हेर्नुहोस्">
+                            <div class="stat-value" id="inProgressComplaintsMain" aria-live="polite">0</div>
+                            <div class="stat-label">चालु उजुरी</div>
+                        </div>
+                        <div class="stat-card" onclick="showComplaintsView({status:'pending'})" style="cursor:pointer" role="button" tabindex="0" aria-label="काम बाँकी उजुरीहरू हेर्नुहोस्">
+                            <div class="stat-value" id="pendingComplaintsMain" aria-live="polite">0</div>
+                            <div class="stat-label">काम बाँकी</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-value" id="resolvedComplaintsMain" aria-live="polite">0</div>
+                            <div class="stat-label">फछ्रयौट भएका</div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="dashboard-grid" aria-label="मोड्युलहरू">
+                <!-- Admin Panel -->
+                <article class="module-card" role="article">
+                    <a href="#" onclick="openAdminLogin()" aria-label="एडमिन प्यानलमा जानुहोस्">
+                        <div class="module-icon">
+                            <i class="fas fa-user-cog"></i>
+                        </div>
+                        <h3 class="module-title">एडमिन प्यानल</h3>
+                        <p class="module-description">
+                            सबै शाखाहरूको व्यवस्थापन, नियन्त्रण र विश्लेषण
+                        </p>
+                    </a>
+                </article>
+
+                <!-- Complaint Management -->
+                <article class="module-card" role="article">
+                    <a href="#" onclick="openShakhaSelection()" aria-label="उजुरी व्यवस्थापनमा जानुहोस्">
+                        <div class="module-icon">
+                            <i class="fas fa-file-alt"></i>
+                        </div>
+                        <h3 class="module-title">उजुरी व्यवस्थापन</h3>
+                        <p class="module-description">
+                            नयाँ उजुरी दर्ता, सम्पादन र उजुरी ट्र्याकिङ <br> 
+                            शाखा अनुसारको उजुरी 
+                        </p>
+                    </a>
+                </article>
+
+                <!-- Reports & Analytics -->
+                <article class="module-card" role="article">
+                    <a href="#" onclick="openReports()" aria-label="रिपोर्ट र विश्लेषणमा जानुहोस्">
+                        <div class="module-icon">
+                            <i class="fas fa-chart-line"></i>
+                        </div>
+                        <h3 class="module-title">रिपोर्ट र विश्लेषण</h3>
+                        <p class="module-description">
+                            विस्तृत रिपोर्ट <br> मूल्याङ्कन र Trend Analysis
+                        </p>
+                    </a>
+                </article>
+
+                <!-- Settings -->
+                <article class="module-card" role="article">
+                    <a href="#" onclick="openSettings()" aria-label="सेटिङहरूमा जानुहोस्">
+                        <div class="module-icon">
+                            <i class="fas fa-cogs"></i>
+                        </div>
+                        <h3 class="module-title">सेटिङहरू</h3>
+                        <p class="module-description">
+                            सिस्टम कन्फिगरेसन, प्रयोगकर्ता व्यवस्थापन, 
+                            र कस्टमाइज्ड सेटिङहरू।
+                        </p>
+                    </a>
+                </article>
+            </section>
+        </main>
+    </div>
+
+    <!-- Login Page -->
+    <div id="loginPage" class="page hidden">
+        <div class="login-container">
+            <div class="login-card">
+                <div class="login-logo">
+                    <img src="emblem.webp" 
+                         alt="नेपालको निशाना छाप" />
+                    <h2 class="login-title" id="loginPageTitle">लग-इन गर्नुहोस्</h2>
+                    <p class="login-subtitle" id="loginPageSubtitle">कृपया आफ्नो युजरनेम र पासवर्ड प्रविष्ट गर्नुहोस्</p>
+                </div>
+                
+                <form id="loginForm" onsubmit="event.preventDefault(); handleLogin();">
+                    <div class="form-group">
+                        <label class="form-label" for="loginUsername">युजरनेम</label>
+                        <div class="input-group">
+                            <span class="input-group-text"><i class="fas fa-user"></i></span>
+                            <input type="text" id="loginUsername" name="username" class="form-control" placeholder="तपाईंको युजरनेम" autocomplete="username" />
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label" for="loginPassword">पासवर्ड</label>
+                        <div class="input-group">
+                            <span class="input-group-text"><i class="fas fa-lock"></i></span>
+                            <input type="password" id="loginPassword" name="password" class="form-control" placeholder="तपाईंको पासवर्ड" autocomplete="current-password" />
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <div class="d-flex justify-between align-center">
+                            <div class="d-flex align-center gap-1">
+                                <input type="checkbox" id="rememberMe" name="remember_me" />
+                                <label for="rememberMe" class="text-small">मलाई सम्झनुहोस्</label>
+                            </div>
+                            <a href="#" class="text-small text-primary" onclick="handleForgotPassword(event)">पासवर्ड बिर्सनुभयो?</a>
+                        </div>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary btn-block" id="loginButton">
+                        <i class="fas fa-sign-in-alt"></i> लग-इन गर्नुहोस्
+                    </button>
+                </form>
+                
+                <div class="login-footer">
+                    <p class="text-xs text-muted">उजुरी व्यवस्थापन प्रणाली</p>
+                    <button type="button" class="btn btn-link btn-sm text-muted" onclick="showPage('mainPage')" style="font-size: 0.8rem; padding: 0.25rem 0.5rem;">
+                        <i class="fas fa-home"></i> गृहपृष्ठ
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Dashboard Layout -->
+    <div id="dashboardPage" class="hidden">
+        <div class="app-container">
+            <!-- Sidebar -->
+            <aside class="sidebar">
+                <div class="sidebar-header d-flex align-center gap-2">
+                    <div class="user-avatar" id="userAvatar">NVC</div>
+                    <div class="user-info">
+                        <div class="text-small" id="userName">प्रयोगकर्ता</div>
+                        <div class="text-xs opacity-80" id="userRole">शाखा</div>
+                    </div>
+                </div>
+                
+                <nav class="sidebar-nav" id="sidebarNav">
+                    <!-- Navigation items will be dynamically loaded -->
+                </nav>
+                
+                <div class="sidebar-footer p-2">
+                    <button class="btn btn-outline w-100" onclick="logout()">
+                        <i class="fas fa-sign-out-alt"></i>
+                        <span class="nav-text">लग आउट</span>
+                    </button>
+                </div>
+            </aside>
+
+            <!-- Main Content -->
+            <main class="main-content">
+                <header class="topbar">
+                    <div class="d-flex align-center gap-3">
+                        <button id="sidebarToggle" class="btn btn-sm btn-outline" title="Toggle Sidebar">
+                            <i class="fas fa-bars"></i>
+                        </button>
+                        <div class="topbar-title" id="pageTitle">ड्यासबोर्ड</div>
+                        <div id="sheetActions" class="d-flex align-center gap-2"></div>
+                        <!-- Compact AI search (scope selector + input) for शाखा/महाशाखा/एडमिन -->
+                        <div class="topbar-search d-flex align-center" style="margin-left:0.75rem;gap:0.5rem;">
+                            <select id="aiSearchScope" class="form-select form-select-sm" style="width:110px;">
+                                <option value="admin">एडमिन</option>
+                                <option value="mahashakha">महाशाखा</option>
+                                <option value="shakha">शाखा</option>
+                            </select>
+                            <input type="text" id="aiSearchInput" class="form-control form-control-sm" placeholder="सोध्नुहोस्..." style="min-width:220px;max-width:360px;" aria-label="AI Search" />
+                            <button class="btn btn-light btn-sm" id="voiceSearchBtn" title="Voice Search"><i class="fas fa-microphone"></i></button>
+                            <button class="btn btn-primary btn-sm" id="aiSearchBtn" title="Search"><i class="fas fa-search"></i></button>
+                        </div>
+                                                <div id="aiSuggestions" class="ai-suggestions-container" style="position:absolute;left:50%;transform:translateX(-50%);top:64px;z-index:60;display:none;max-width:680px;">
+                                                    <!-- Results injected here -->
+                                                </div>
+                                                <button id="aiSuggestionsClose" aria-label="Close search results" title="बन्द गर्नुहोस्" style="position:absolute;left:calc(50% + 340px);top:56px;z-index:65;display:none;border-radius:4px;padding:4px 6px;background:#fff;border:1px solid #ddd;">
+                                                    <i class="fas fa-times"></i>
+                                                </button>
+                    </div>
+                    <div class="topbar-actions">
+                        <div class="notification-bell" onclick="toggleNotifications()">
+                            <i class="fas fa-bell"></i>
+                            <span class="notification-badge" id="notificationCount"></span>
+                            <div class="notification-dropdown" id="notificationDropdown">
+                                <!-- Notifications will be dynamically loaded -->
+                            </div>
+                        </div>
+                        <div class="user-menu" style="cursor: pointer;">
+                            <div class="user-avatar" id="topbarAvatar">U</div>
+                            <div class="user-info">
+                                <div class="text-small" id="topbarUserName">प्रयोगकर्ता</div>
+                                <div class="text-xs text-muted" id="topbarUserRole">शाखा</div>
+                            </div>
+                            <i class="fas fa-chevron-down text-xs"></i>
+                            <div class="user-dropdown" id="userDropdown">
+                                <div class="dropdown-item" id="logoutButton" style="cursor: pointer;">
+                                    <i class="fas fa-sign-out-alt"></i> लग आउट
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </header>
+
+                <div class="content-area" id="contentArea">
+                    <!-- Content will be dynamically loaded -->
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <!-- Modals -->
+    <div id="complaintModal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalTitle">मोडल</h5>
+                <button class="action-btn" onclick="closeModal()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body" id="modalBody">
+                <!-- Modal content will be loaded here -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Shakha Selection Modal -->
+    <div id="shakhaModal" class="modal hidden">
+        <div class="modal-content" style="max-width: 700px;">
+            <div class="modal-header">
+                <h5 class="modal-title">शाखा चयन गर्नुहोस्</h5>
+                <button class="action-btn" onclick="closeShakhaModal()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="d-grid gap-3" style="grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));">
+                    <!-- Shakha options will be dynamically loaded -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Settings Modal (Added) -->
+    <div id="settingsModal" class="modal hidden">
+        <div class="modal-content" style="max-width: 500px;">
+            <div class="modal-header">
+                <h5 class="modal-title">सेटिङहरू (Settings)</h5>
+                <button class="action-btn" onclick="closeSettingsModal()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <form onsubmit="event.preventDefault(); saveSettings();">
+                    <div class="mb-3">
+                        <div class="form-label fw-bold">प्रणाली सेटिङ (System Settings)</div>
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="darkModeSwitch" name="dark_mode" onchange="toggleDarkMode()">
+                            <label class="form-check-label" for="darkModeSwitch">डार्क मोड (Dark Mode)</label>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <div class="form-label fw-bold">नोटिफिकेसन (Notifications)</div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="emailNotif" name="email_notification" checked>
+                            <label class="form-check-label" for="emailNotif">इमेल नोटिफिकेसन</label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="smsNotif" name="sms_notification">
+                            <label class="form-check-label" for="smsNotif">SMS नोटिफिकेसन</label>
+                        </div>
+                    </div>
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-primary">सेटिङ सेभ गर्नुहोस्</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- AI Chatbot Widget -->
+    <div id="chatbotToggler" class="chatbot-toggler" title="Drag to move — click to open">
+        <i class="fas fa-robot"></i>
+    </div>
+    <div class="chatbot-window" id="chatbotWindow">
+        <div class="chat-header">
+            <div class="d-flex align-center gap-2">
+                <i class="fas fa-robot"></i>
+                <div>
+                    <h6 class="mb-0">NVC AI सहायक</h6>
+                    <span class="text-xs opacity-80">अनलाइन</span>
+                </div>
+            </div>
+            <i class="fas fa-times pointer" onclick="toggleChatbot()">×</i>
+        </div>
+        <div class="chat-body" id="chatBody">
+            <div class="chat-message chat-bot-msg">नमस्ते! म राष्ट्रिय सतर्कता केन्द्रको AI सहायक हुँ। म तपाईंलाई कसरी सहयोग गर्न सक्छु?</div>
+        </div>
+        <div class="chat-footer">
+            <input type="text" id="chatInput" name="chat_message" placeholder="यहाँ लेख्नुहोस्..." onkeypress="if(event.key === 'Enter') sendChatMessage()" autocomplete="off">
+            <button onclick="sendChatMessage()"><i class="fas fa-paper-plane"></i></button>
+        </div>
+    </div>
+
+    <!-- Scripts - Optimized Loading -->
+    <!-- Critical jQuery (preloaded, deferred) -->
+    <link rel="preload" href="https://code.jquery.com/jquery-3.6.0.min.js" as="script">
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js" defer></script>
+    
+    <!-- Defer non-critical libraries -->
+    <link rel="preload" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js" as="script">
+    <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js" defer></script>
+    
+    <link rel="preload" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js" as="script">
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js" defer></script>
+    
+    <link rel="preload" href="https://unpkg.com/nepali-date-picker@2.0.2/dist/nepaliDatePicker.min.js" as="script">
+    <script src="https://unpkg.com/nepali-date-picker@2.0.2/dist/nepaliDatePicker.min.js" defer></script>
+    
+    <link rel="preload" href="https://cdn.jsdelivr.net/npm/chart.js" as="script">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js" defer></script>
+    
+    <link rel="preload" href="https://cdn.jsdelivr.net/npm/toastify-js" as="script">
+    <script src="https://cdn.jsdelivr.net/npm/toastify-js" defer></script>
+    
+    <!-- jsPDF for PDF export functionality -->
+    <link rel="preload" href="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" as="script">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" defer></script>
+    
+    <!-- html2canvas for better Unicode support in PDF -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" defer></script>
+    
+    <!-- Devanagari font for PDF export -->
+    <script src="https://cdn.jsdelivr.net/gh/parallax/jsPDF@master/dist/jspdf.plugin.ttf.min.js" defer></script>
+
+    <!-- यो नयाँ थप्ने: Nepali DatePicker default language नेपाली सेट गर्न -->
+    <script>
+        // Nepali DatePicker को लागि पूर्व-सेटिङ
+        if (typeof $ !== 'undefined' && $.fn && $.fn.nepaliDatePicker && typeof $.fn.nepaliDatePicker.setDefaults === 'function') {
+            $(document).ready(function() {
+                $.fn.nepaliDatePicker.setDefaults({
+                    language: 'nepali',
+                    ndpYear: true,
+                    ndpMonth: true,
+                    ndpYearCount: 10
+                });
+            });
+        }
+</script>
+
+    <!-- Load config early so legacy script picks up GOOGLE_SHEETS_CONFIG -->
+    <script src="config.js" defer></script>
+    <!-- Load core modules with defer for better performance -->
+    <script src="utils.js" defer></script>
+    <script src="state.js" defer></script>
+    <script src="api.js" defer></script>
+    <script src="ai_chatbot.js" defer></script>
+    <script src="ui.js" defer></script>
+    <script src="main.js" defer></script>
+    <script src="nepali-calendar-api.js" defer></script>
+    <!-- Then load legacy bundle which expects globals above -->
+    <script src="script.js" defer></script>
+
+<script>
+    // PWA Service Worker Registration - Only for production
+    if ('serviceWorker' in navigator && window.location.protocol !== 'file:') {
+        window.addEventListener('load', () => {
+            navigator.serviceWorker.register('/service-worker.js')
+                .then(reg => console.log('Service Worker registered', reg))
+                .catch(err => console.log('Service Worker failed', err));
+        });
+    }
+
+    // Settings Functionality
+    function openSettings() {
+        const modal = document.getElementById('settingsModal');
+        if (modal) {
+            modal.classList.remove('hidden');
+            // Sync Dark Mode Switch
+            const darkModeSwitch = document.getElementById('darkModeSwitch');
+            if (darkModeSwitch) {
+                darkModeSwitch.checked = document.body.classList.contains('dark-mode');
+            }
+        }
+    }
+
+    function closeSettingsModal() {
+        const modal = document.getElementById('settingsModal');
+        if (modal) {
+            modal.classList.add('hidden');
+        }
+    }
+
+    function toggleDarkMode() {
+        document.body.classList.toggle('dark-mode');
+    }
+
+    function saveSettings() {
+        closeSettingsModal();
+        if (typeof Toastify === 'function') {
+            Toastify({
+                text: "सेटिङहरू सफलतापूर्वक सेभ भयो!",
+                duration: 3000,
+                gravity: "top",
+                position: "right",
+                style: { background: "#28a745" }
+            }).showToast();
+        } else {
+            alert("सेटिङहरू सफलतापूर्वक सेभ भयो!");
+        }
+    }
+</script>
+
+<script>
+    // साइडबारमा रहेको 'सेटिङहरू' लिङ्कले काम नगर्ने समस्याको समाधान
+    document.addEventListener('DOMContentLoaded', () => {
+        const sidebarNav = document.getElementById('sidebarNav');
+        if (sidebarNav) {
+            // Event delegation to handle clicks on dynamically loaded items
+            sidebarNav.addEventListener('click', (event) => {
+                const link = event.target.closest('a');
+                if (!link) return;
+
+                // Check if the clicked link is the 'Settings' link by its text content
+                const linkText = link.querySelector('.nav-text');
+                if (linkText && linkText.innerText.trim() === 'सेटिङहरू') {
+                    event.preventDefault();
+                    openSettings();
+                }
+            });
+        }
+    });
+</script>
+
+<!-- Fix for Action Buttons and Edit Logic (Added by AI) -->
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // १. Action बटनहरूको लागि Event Delegation
+        // यसले फिल्टर वा रिलोड पछि पनि बटनहरूले काम गर्ने सुनिश्चित गर्छ
+        const contentArea = document.getElementById('contentArea');
+        
+        if (contentArea) {
+            contentArea.addEventListener('click', function(e) {
+                // Edit बटन क्लिक ह्यान्डल गर्ने
+                // बटनमा .btn-edit क्लास र data-id, data-json एट्रीब्युट हुनुपर्छ
+                const editBtn = e.target.closest('.btn-edit');
+                if (editBtn) {
+                    e.preventDefault();
+                    const id = editBtn.getAttribute('data-id');
+                    const rowData = editBtn.getAttribute('data-json'); // पूरा डाटा JSON स्ट्रिङको रूपमा
+                    
+                    if (id && typeof openEditModal === 'function') {
+                        openEditModal(id, rowData);
+                    } else {
+                        console.error("Error: ID missing or openEditModal function not found.");
+                        // यदि openEditModal छैन भने यहाँ फलब्याक लजिक लेख्न सकिन्छ
+                        // उदाहरण: populateForm(JSON.parse(rowData));
+                    }
+                }
+
+                // Delete बटन क्लिक ह्यान्डल गर्ने
+                const deleteBtn = e.target.closest('.btn-delete');
+                if (deleteBtn) {
+                    e.preventDefault();
+                    const id = deleteBtn.getAttribute('data-id');
+                    
+                    if (id && confirm('के तपाई यो उजुरी हटाउन चाहनुहुन्छ? यो कार्य फिर्ता लिन सकिँदैन।')) {
+                        if (typeof deleteComplaint === 'function') {
+                            deleteComplaint(id);
+                        } else {
+                            console.error("deleteComplaint function not found.");
+                        }
+                    }
+                }
+            });
+        }
+    });
+</script>
+
+<!-- Fix for Action Buttons (Event Delegation Backup) -->
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const contentArea = document.getElementById('contentArea');
+        if (contentArea) {
+            contentArea.addEventListener('click', function(e) {
+                // Check if clicked element is inside an action button
+                const btn = e.target.closest('.action-btn');
+                if (btn && !btn.onclick) {
+                    // If button exists but has no inline handler, try to handle it here
+                    if (typeof handleTableActions === 'function') {
+                        handleTableActions(e);
+                    }
+                }
+            });
+        }
+    });
+</script>
+
+<!-- Make chatbot toggler draggable (pointer events) and persist position -->
+<script>
+    (function(){
+        const key = 'chatbotTogglerPos';
+        const toggler = document.getElementById('chatbotToggler');
+        if (!toggler) return;
+
+        // Restore saved position if available
+        try {
+            const saved = JSON.parse(localStorage.getItem(key));
+            if (saved && typeof saved.left === 'number' && typeof saved.top === 'number') {
+                toggler.style.left = saved.left + 'px';
+                toggler.style.top = saved.top + 'px';
+                toggler.style.right = 'auto';
+                toggler.style.bottom = 'auto';
+            } else {
+                toggler.style.right = '20px';
+                toggler.style.bottom = '20px';
+            }
+        } catch (e) {
+            toggler.style.right = '20px';
+            toggler.style.bottom = '20px';
+        }
+
+        let dragging = false;
+        let startX = 0, startY = 0, startLeft = 0, startTop = 0;
+        let moved = false;
+
+        function onPointerDown(e){
+            e.preventDefault();
+            dragging = true;
+            moved = false;
+            toggler.setPointerCapture && toggler.setPointerCapture(e.pointerId);
+            const rect = toggler.getBoundingClientRect();
+            startX = e.clientX;
+            startY = e.clientY;
+            startLeft = rect.left;
+            startTop = rect.top;
+            toggler.style.transition = 'none';
+        }
+
+        function onPointerMove(e){
+            if (!dragging) return;
+            const dx = e.clientX - startX;
+            const dy = e.clientY - startY;
+            const newLeft = Math.min(Math.max(8, startLeft + dx), window.innerWidth - toggler.offsetWidth - 8);
+            const newTop = Math.min(Math.max(8, startTop + dy), window.innerHeight - toggler.offsetHeight - 8);
+            toggler.style.left = newLeft + 'px';
+            toggler.style.top = newTop + 'px';
+            toggler.style.right = 'auto';
+            toggler.style.bottom = 'auto';
+            if (Math.hypot(dx, dy) > 4) moved = true;
+        }
+
+        function onPointerUp(e){
+            if (!dragging) return;
+            dragging = false;
+            try { toggler.releasePointerCapture && toggler.releasePointerCapture(e.pointerId); } catch (err) {}
+            toggler.style.transition = '';
+            // persist
+            const rect = toggler.getBoundingClientRect();
+            try {
+                localStorage.setItem(key, JSON.stringify({ left: Math.round(rect.left), top: Math.round(rect.top) }));
+            } catch (err) {}
+            // small delay before clearing moved so click isn't suppressed too long
+            setTimeout(() => { moved = false; }, 50);
+        }
+
+        toggler.addEventListener('pointerdown', onPointerDown);
+        window.addEventListener('pointermove', onPointerMove);
+        window.addEventListener('pointerup', onPointerUp);
+
+        // Click handler — only trigger open when user didn't drag
+        toggler.addEventListener('click', function(e){
+            if (moved) {
+                e.stopImmediatePropagation();
+                e.preventDefault();
+                return;
+            }
+            if (typeof toggleChatbot === 'function') {
+                toggleChatbot();
+            } else {
+                const win = document.getElementById('chatbotWindow');
+                if (win) win.classList.toggle('visible');
+            }
+        });
+    })();
+</script>
+
+<!-- Loading Spinner -->
+<div id="loadingSpinner" class="loading-spinner-overlay" style="display: none;">
+    <div class="loading-spinner-container">
+        <div class="spinner"></div>
+        <div class="loading-status-text" id="loadingStatusText">सेभ हुँदैछ...</div>
+    </div>
+</div>
+
+</body>
+</html>

@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Google Sheets Connection Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-result { padding: 10px; margin: 10px 0; border-radius: 5px; }
+        .success { background-color: #d4edda; color: #155724; }
+        .error { background-color: #f8d7da; color: #721c24; }
+        .info { background-color: #d1ecf1; color: #0c5460; }
+    </style>
+</head>
+<body>
+    <h1>Google Sheets Connection Test</h1>
+    
+    <div id="testResults"></div>
+    
+    <button onclick="testConnection()">Test Connection</button>
+    <button onclick="testSaveNotice()">Test Save Notice</button>
+    
+    <script>
+        const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbwTEX3902IoU0oIr9uRjUWqeVqBbFEpTwf5bHUFsAcj00m7Moyg5kt2xYd7AAa7j3-Syg/exec';
+        const API_KEY = 'nvc2026secretkey';
+        
+        function log(message, type = 'info') {
+            const results = document.getElementById('testResults');
+            const div = document.createElement('div');
+            div.className = `test-result ${type}`;
+            div.innerHTML = `<strong>${new Date().toLocaleTimeString()}</strong>: ${message}`;
+            results.appendChild(div);
+        }
+        
+        function testConnection() {
+            log('Testing connection to Google Apps Script...', 'info');
+            
+            const url = `${WEB_APP_URL}?action=getActiveNotices&apiKey=${API_KEY}&callback=testCallback&t=${Date.now()}`;
+            
+            // Create script element for JSONP
+            const script = document.createElement('script');
+            script.src = url;
+            
+            window.testCallback = function(response) {
+                if (response && response.success) {
+                    log('✅ Connection successful! Google Apps Script is accessible.', 'success');
+                    log(`Found ${response.data ? response.data.length : 0} active notices.`, 'info');
+                } else {
+                    log('❌ Connection failed: ' + (response.error || 'Unknown error'), 'error');
+                }
+                document.body.removeChild(script);
+            };
+            
+            script.onerror = function() {
+                log('❌ Network error: Google Apps Script URL is not accessible', 'error');
+                log('Possible causes:', 'info');
+                log('1. Google Apps Script deployment permissions are not set to "Anyone"', 'info');
+                log('2. The deployment URL is incorrect', 'info');
+                log('3. The script is not published as a web app', 'info');
+                document.body.removeChild(script);
+            };
+            
+            document.body.appendChild(script);
+        }
+        
+        function testSaveNotice() {
+            log('Testing save notice functionality...', 'info');
+            
+            const noticeData = {
+                title: 'Test Notice',
+                description: 'This is a test notice from the connection test.',
+                status: 'active',
+                publishDate: new Date().toISOString().split('T')[0],
+                uploadedBy: 'Test User'
+            };
+            
+            const formData = new FormData();
+            formData.append('action', 'saveNotice');
+            formData.append('apiKey', API_KEY);
+            formData.append('title', noticeData.title);
+            formData.append('description', noticeData.description);
+            formData.append('status', noticeData.status);
+            formData.append('publishDate', noticeData.publishDate);
+            formData.append('uploadedBy', noticeData.uploadedBy);
+            
+            fetch(WEB_APP_URL, {
+                method: 'POST',
+                body: formData,
+                mode: 'no-cors'
+            })
+            .then(() => {
+                log('✅ Save request sent successfully (no-cors mode)', 'success');
+                log('Check your Google Sheets to see if the notice was saved.', 'info');
+            })
+            .catch(error => {
+                log('❌ Save request failed: ' + error.message, 'error');
+            });
+        }
+    </script>
+</body>
+</html>

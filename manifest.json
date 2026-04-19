@@ -1,0 +1,18 @@
+{
+  "name": "राष्ट्रिय सतर्कता केन्द्र - उजुरी व्यवस्थापन",
+  "short_name": "NVC",
+  "description": "उजुरी व्यवस्थापन प्रणाली — राष्ट्रिय सतर्कता केन्द्र",
+  "start_url": ".",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#133f81",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "emblem.webp",
+      "sizes": "any",
+      "type": "image/webp"
+    }
+  ]
+}
