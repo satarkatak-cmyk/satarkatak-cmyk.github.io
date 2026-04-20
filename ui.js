@@ -99,6 +99,12 @@
           modal.style.setProperty('z-index', '2147483647', 'important');
           modal.style.setProperty('display', 'flex', 'important');
           modal.style.setProperty('visibility', 'visible', 'important');
+          modal.style.setProperty('opacity', '1', 'important');
+          // Also ensure modal-content is visible
+          const modalContent = modal.querySelector('.modal-content');
+          if (modalContent) {
+            modalContent.style.setProperty('opacity', '1', 'important');
+          }
           try {
             const comp = window.getComputedStyle(modal);
             const rect = modal.getBoundingClientRect();
@@ -189,12 +195,12 @@
       const isExplicitModalClose = btn.classList.contains('modal-close');
       if (!inHeader && !isExplicitModalClose) return;
 
-      e.preventDefault();
       if (window.NVC && NVC.UI && typeof NVC.UI.closeModal === 'function') {
+        e.preventDefault();
         if (modal.id) return NVC.UI.closeModal(modal.id);
         return NVC.UI.closeModal();
       }
-      modal.classList.add('hidden');
+      e.preventDefault(); modal.classList.add('hidden');
     } catch (err) { /* fail silently */ }
   });
 

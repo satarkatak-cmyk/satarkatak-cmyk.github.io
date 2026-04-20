@@ -63,7 +63,7 @@ function showHotlineComplaintsView(initialFilters = {}) {
                   <td data-label="सम्बन्धित शाखा">${displayShakhaName(complaint.assignedShakha || complaint.shakha || complaint.assignedShakhaName) || '-'}</td>
                   <td data-label="शाखामा पठाएको मिति">${resolveComplaintAssignedDateSimple(complaint) || '-'}</td>
                   <td data-label="स्थिति"><span class="status-badge ${complaint.status === 'resolved' ? 'status-resolved' : complaint.status === 'pending' ? 'status-pending' : 'status-progress'}">${complaint.status === 'resolved' ? 'फछ्रयौट' : complaint.status === 'pending' ? 'काम बाँकी' : 'चालु'}</span></td>
-                  <td data-label="कार्य"><div class="table-actions"><button class="action-btn" onclick="handleTableActions(event)" data-action="view" data-id="${complaint.id}" title="हेर्नुहोस्"><i class="fas fa-eye"></i></button><button class="action-btn" onclick="handleTableActions(event)" data-action="assign" data-id="${complaint.id}" title="शाखामा पठाउनुहोस्"><i class="fas fa-paper-plane"></i></button></div></td>
+                  <td data-label="कार्य"><div class="table-actions"><button class="action-btn" data-action="view" data-id="${complaint.id}" title="हेर्नुहोस्"><i class="fas fa-eye"></i></button><button class="action-btn" data-action="assign" data-id="${complaint.id}" title="शाखामा पठाउनुहोस्"><i class="fas fa-paper-plane"></i></button></div></td>
                 </tr>
               `).join('')}
             </tbody>
@@ -4080,6 +4080,20 @@ function openModal(title, content) {
     document.getElementById('modalTitle').textContent = title;
     document.getElementById('modalBody').innerHTML = content;
     document.getElementById('complaintModal').classList.remove('hidden');
+    // mark modal open timestamp to avoid immediate-close race with other handlers
+    try { window._nvc_modalJustOpened = Date.now(); } catch (e) {}
+    // Force modal to be visible
+    try {
+      const modal = document.getElementById('complaintModal');
+      if (modal) {
+        modal.style.setProperty('opacity', '1', 'important');
+        modal.style.setProperty('visibility', 'visible', 'important');
+        const modalContent = modal.querySelector('.modal-content');
+        if (modalContent) {
+          modalContent.style.setProperty('opacity', '1', 'important');
+        }
+      }
+    } catch(e) {}
     if (typeof applyDevanagariDigits === 'function') applyDevanagariDigits(document.getElementById('complaintModal'));
     setTimeout(() => { try { if (typeof initializeDatepickers === 'function') initializeDatepickers(); if (typeof initializeNepaliDropdowns === 'function') initializeNepaliDropdowns(); } catch(e){} }, 200);
   } catch (e) { console.error('openModal fallback failed', e); }
@@ -5702,6 +5716,20 @@ function openModal(title, content) {
     document.getElementById('modalTitle').textContent = title;
     document.getElementById('modalBody').innerHTML = content;
     document.getElementById('complaintModal').classList.remove('hidden');
+    // mark modal open timestamp to avoid immediate-close race with other handlers
+    try { window._nvc_modalJustOpened = Date.now(); } catch (e) {}
+    // Force modal to be visible
+    try {
+      const modal = document.getElementById('complaintModal');
+      if (modal) {
+        modal.style.setProperty('opacity', '1', 'important');
+        modal.style.setProperty('visibility', 'visible', 'important');
+        const modalContent = modal.querySelector('.modal-content');
+        if (modalContent) {
+          modalContent.style.setProperty('opacity', '1', 'important');
+        }
+      }
+    } catch(e) {}
     if (typeof applyDevanagariDigits === 'function') applyDevanagariDigits(document.getElementById('complaintModal'));
   } catch (e) { console.error('openModal fallback failed', e); }
 }
@@ -5727,7 +5755,10 @@ function _closeModal() {
 NVC.UI.closeModal = _closeModal;
 
 function closeModal() {
-  try { console.log('[global closeModal] called, args=', arguments); } catch(e){}
+  try { 
+    console.log('[global closeModal] called, args=', arguments); 
+    console.log('[global closeModal] stack trace:', (new Error()).stack);
+  } catch(e){}
   try {
     const id = arguments && arguments.length > 0 ? arguments[0] : null;
     let el = null;
@@ -5737,8 +5768,10 @@ function closeModal() {
     // Avoid closing immediately after opening (race with openModalContent handlers)
     try {
       const justOpened = window._nvc_modalJustOpened || 0;
-      if (justOpened && (Date.now() - justOpened) < 300) {
-        console.log('[global closeModal] ignored due to recent open (<300ms)');
+      const timeDiff = Date.now() - justOpened;
+      console.log('[global closeModal] timeSinceOpen:', timeDiff);
+      if (justOpened && timeDiff < 500) {
+        console.log('[global closeModal] ignored due to recent open (<500ms)');
         // clear flag after ignoring once so future closes work
         try { delete window._nvc_modalJustOpened; } catch(e){}
         return;
@@ -7546,9 +7579,19 @@ function setupEventListeners() {
       if (dropdown) dropdown.classList.remove('show');
     }
     
-    // Close modals if clicked on backdrop
+    // Close modals if clicked on backdrop (but not immediately after opening)
     const modal = document.getElementById('complaintModal');
-    if (e.target === modal) closeModal();
+    if (e.target === modal) {
+      const justOpened = window._nvc_modalJustOpened || 0;
+      const timeDiff = Date.now() - justOpened;
+      console.log('[Backdrop click] timeDiff:', timeDiff, 'target:', e.target, 'modal:', modal);
+      if (!window._nvc_modalJustOpened || timeDiff > 500) {
+        console.log('[Backdrop click] calling closeModal');
+        closeModal();
+      } else {
+        console.log('[Backdrop click] ignored due to recent open');
+      }
+    }
     
     const shakhaModal = document.getElementById('shakhaModal');
     if (e.target === shakhaModal) closeShakhaModal();
@@ -7582,7 +7625,7 @@ function setupEventListeners() {
       // started (mousedown set by ui.js), let modal-specific handlers handle
       // it to avoid duplicate handling and premature closes.
       try {
-        if ((window._nvc_modalInteraction && (Date.now() - window._nvc_modalInteraction) < 1000) || (btn && btn.closest && btn.closest('.modal'))) return;
+        if ((window._nvc_modalInteraction && (Date.now() - window._nvc_modalInteraction) < 150) || (btn && btn.closest && btn.closest('.modal'))) return;
       } catch(e) {}
       if (!btn) return;
       // Delegated handler: call action function but avoid overriding native events
@@ -7618,7 +7661,7 @@ function setupEventListeners() {
     } catch (err) {
       console.error('Error in delegated action-btn handler', err);
     }
-  }, true); // use capture so we intercept before target phase
+  }, false); // use bubble phase to allow handlers on target elements to fire first and stopPropagation if needed
 
   // Ensure modal header close buttons reliably close their modal (fixes clicks
   // on FontAwesome pseudo-elements like .fa-times:after not triggering inline
@@ -11310,7 +11353,7 @@ function showOnlineComplaintsView(initialFilters = {}) {
                   <td data-label="सम्बन्धित शाखा">${displayShakhaName(resolveAssignedShakha(complaint)) || '-'}</td><td data-label="शाखामा पठाएको मिति">${resolveAssignedDate(complaint) || '-'}</td>
                   <td data-label="निर्णय" class="text-limit" title="${complaint.decision || ''}">${complaint.decision ? complaint.decision.toString().substring(0, 30) + '...' : '-'}</td>
                   <td data-label="कैफियत">${complaint.remarks || '-'}</td>
-                  <td data-label="कार्य"><div class="table-actions"><button class="action-btn" onclick="handleTableActions(event)" data-action="view" data-func="viewOnlineComplaint" data-id="${complaint.id}" title="हेर्नुहोस्"><i class="fas fa-eye"></i></button><button class="action-btn" onclick="handleTableActions(event)" data-action="assign" data-func="assignOnlineComplaint" data-id="${complaint.id}" title="शाखामा पठाउनुहोस्"><i class="fas fa-paper-plane"></i></button><button class="action-btn" onclick="handleTableActions(event)" data-action="edit" data-func="editOnlineComplaint" data-id="${complaint.id}" title="सम्पादन गर्नुहोस्"><i class="fas fa-edit"></i></button></div></td>
+                  <td data-label="कार्य"><div class="table-actions"><button class="action-btn" data-action="view" data-func="viewOnlineComplaint" data-id="${complaint.id}" title="हेर्नुहोस्"><i class="fas fa-eye"></i></button><button class="action-btn" data-action="assign" data-func="assignOnlineComplaint" data-id="${complaint.id}" title="शाखामा पठाउनुहोस्"><i class="fas fa-paper-plane"></i></button><button class="action-btn" data-action="edit" data-func="editOnlineComplaint" data-id="${complaint.id}" title="सम्पादन गर्नुहोस्"><i class="fas fa-edit"></i></button></div></td>
                 </tr>
               `).join('')}
             </tbody>
@@ -11923,7 +11966,7 @@ function showAdminComplaintsView(initialFilters = {}) {
                   <td data-label="शाखामा पठाएको मिति">${resolveComplaintAssignedDate(complaint) || '-'}</td>
                   <td data-label="निर्णय" class="text-limit" title="${complaint.decision || ''}">${complaint.decision ? complaint.decision.substring(0, 30) + '...' : '-'}</td>
                   <td data-label="कैफियत">${complaint.remarks || '-'}</td>
-                  <td data-label="कार्य"><div class="table-actions"><button class="action-btn" onclick="handleTableActions(event)" data-action="view" data-id="${complaint.id}" title="हेर्नुहोस्"><i class="fas fa-eye"></i></button><button class="action-btn" onclick="handleTableActions(event)" data-action="assign" data-id="${complaint.id}" title="शाखामा पठाउनुहोस्"><i class="fas fa-paper-plane"></i></button><button class="action-btn" onclick="handleTableActions(event)" data-action="edit" data-id="${complaint.id}" title="सम्पादन गर्नुहोस्"><i class="fas fa-edit"></i></button></div></td>
+                  <td data-label="कार्य"><div class="table-actions"><button class="action-btn" data-action="view" data-id="${complaint.id}" title="हेर्नुहोस्"><i class="fas fa-eye"></i></button><button class="action-btn" data-action="assign" data-id="${complaint.id}" title="शाखामा पठाउनुहोस्"><i class="fas fa-paper-plane"></i></button><button class="action-btn" data-action="edit" data-id="${complaint.id}" title="सम्पादन गर्नुहोस्"><i class="fas fa-edit"></i></button></div></td>
                 </tr>
               `).join('')}
             </tbody>
@@ -12291,51 +12334,69 @@ function showNewHelloSarkarComplaint() {
 }
 
 function showNewHotlineComplaint() {
-  const currentDate = getCurrentNepaliDate();
-  const formContent = `
-    <div class="d-grid gap-3">
-      <div class="d-grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
-        <div class="form-group"><label class="form-label">उजुरी नं *</label><input type="text" class="form-control" id="hlComplaintId" placeholder="HL-YYYY-NNNN" /></div>
+  try {
+    console.log('showNewHotlineComplaint called');
+    const currentDate = getCurrentNepaliDate();
+    const formContent = `
+      <div class="d-grid gap-3">
+        <div class="d-grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
+          <div class="form-group"><label class="form-label">उजुरी नं *</label><input type="text" class="form-control" id="hlComplaintId" placeholder="HL-YYYY-NNNN" /></div>
+          <div class="form-group">
+              <label class="form-label">मिति *</label>
+              <div class="d-flex gap-2 nepali-datepicker-dropdown" data-target="hlComplaintDate">
+                <select id="hlComplaintDate_year" class="form-select bs-year" aria-label="वर्ष"></select>
+                <select id="hlComplaintDate_month" class="form-select bs-month" aria-label="महिना"></select>
+                <select id="hlComplaintDate_day" class="form-select bs-day" aria-label="दिन"></select>
+                <input type="hidden" id="hlComplaintDate" value="${currentDate}" />
+              </div>
+          </div>
+        </div>
+        <div class="d-grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
+          <div class="form-group"><label class="form-label">उजुरकर्ता *</label><input type="text" class="form-control" id="hlComplainant" placeholder="पूरा नाम" /></div>
+          <div class="form-group"><label class="form-label">विपक्षी</label><input type="text" class="form-control" id="hlAccused" placeholder="विपक्षीको नाम" /></div>
+        </div>
         <div class="form-group">
-            <label class="form-label">मिति *</label>
-            <div class="d-flex gap-2 nepali-datepicker-dropdown" data-target="hlComplaintDate">
-              <select id="hlComplaintDate_year" class="form-select bs-year" aria-label="वर्ष"></select>
-              <select id="hlComplaintDate_month" class="form-select bs-month" aria-label="महिना"></select>
-              <select id="hlComplaintDate_day" class="form-select bs-day" aria-label="दिन"></select>
-              <input type="hidden" id="hlComplaintDate" value="${currentDate}" />
-            </div>
+          <label class="form-label">उजुरीको विवरण *</label>
+          <textarea class="form-control" rows="4" id="hlDescription" placeholder="उजुरीको विवरण"></textarea>
+          <div class="mt-2 d-flex justify-content-end">
+              <button type="button" id="hlDescVoiceBtn" class="btn btn-sm btn-outline-primary" title="आवाजले लेख्नुहोस् (नेपाली)"><i class="fas fa-microphone"></i> आवाज टाइप</button>
+          </div>
         </div>
-      </div>
-      <div class="d-grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
-        <div class="form-group"><label class="form-label">उजुरकर्ता *</label><input type="text" class="form-control" id="hlComplainant" placeholder="पूरा नाम" /></div>
-        <div class="form-group"><label class="form-label">विपक्षी</label><input type="text" class="form-control" id="hlAccused" placeholder="विपक्षीको नाम" /></div>
-      </div>
-      <div class="form-group">
-        <label class="form-label">उजुरीको विवरण *</label>
-        <textarea class="form-control" rows="4" id="hlDescription" placeholder="उजुरीको विवरण"></textarea>
-        <div class="mt-2 d-flex justify-content-end">
-            <button type="button" id="hlDescVoiceBtn" class="btn btn-sm btn-outline-primary" title="आवाजले लेख्नुहोस् (नेपाली)"><i class="fas fa-microphone"></i> आवाज टाइप</button>
+        <div class="form-group"><label class="form-label">सम्बन्धित शाखा *</label><select class="form-select" id="hlAssignedShakha"><option value="">छान्नुहोस्</option>${Object.entries(SHAKHA).map(([key, value]) => `<option value="${key}">${value}</option>`).join('')}</select></div>
+        <div class="d-grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
+          <div class="form-group">
+              <label class="form-label">शाखामा पठाएको मिति</label>
+              <div class="d-flex gap-2 nepali-datepicker-dropdown" data-target="hlAssignedDate">
+                <select id="hlAssignedDate_year" class="form-select bs-year" aria-label="वर्ष"></select>
+                <select id="hlAssignedDate_month" class="form-select bs-month" aria-label="महिना"></select>
+                <select id="hlAssignedDate_day" class="form-select bs-day" aria-label="दिन"></select>
+                <input type="hidden" id="hlAssignedDate" />
+              </div>
+          </div>
+          <div class="form-group"><label class="form-label">स्थिति</label><select class="form-select" id="hlStatus"><option value="pending">काम बाँकी</option><option value="progress">चालु</option><option value="resolved">फछ्रयौट</option></select></div>
         </div>
+        <div class="form-group"><label class="form-label">कैफियत</label><textarea class="form-control" rows="2" id="hlRemarks" placeholder="कैफियत"></textarea></div>
       </div>
-      <div class="form-group"><label class="form-label">सम्बन्धित शाखा *</label><select class="form-select" id="hlAssignedShakha"><option value="">छान्नुहोस्</option>${Object.entries(SHAKHA).map(([key, value]) => `<option value="${key}">${value}</option>`).join('')}</select></div>
-      <div class="d-grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
-        <div class="form-group">
-            <label class="form-label">शाखामा पठाएको मिति</label>
-            <div class="d-flex gap-2 nepali-datepicker-dropdown" data-target="hlAssignedDate">
-              <select id="hlAssignedDate_year" class="form-select bs-year" aria-label="वर्ष"></select>
-              <select id="hlAssignedDate_month" class="form-select bs-month" aria-label="महिना"></select>
-              <select id="hlAssignedDate_day" class="form-select bs-day" aria-label="दिन"></select>
-              <input type="hidden" id="hlAssignedDate" />
-            </div>
-        </div>
-        <div class="form-group"><label class="form-label">स्थिति</label><select class="form-select" id="hlStatus"><option value="pending">काम बाँकी</option><option value="progress">चालु</option><option value="resolved">फछ्रयौट</option></select></div>
-      </div>
-      <div class="form-group"><label class="form-label">कैफियत</label><textarea class="form-control" rows="2" id="hlRemarks" placeholder="कैफियत"></textarea></div>
-    </div>
-    <div class="modal-footer"><button class="btn btn-outline" onclick="closeModal()">रद्द गर्नुहोस्</button><button class="btn btn-primary" onclick="saveHotlineComplaint()">सुरक्षित गर्नुहोस्</button></div>
-  `;
-  openModal('नयाँ हटलाइन उजुरी', formContent);
-  setTimeout(()=>{ initializeDatepickers(); initializeNepaliDropdowns(); initializeFieldSpeech(); }, 100);
+      <div class="modal-footer"><button class="btn btn-outline" onclick="closeModal()">रद्द गर्नुहोस्</button><button class="btn btn-primary" onclick="saveHotlineComplaint()">सुरक्षित गर्नुहोस्</button></div>
+    `;
+    console.log('Opening modal for hotline complaint');
+    openModal('नयाँ हटलाइन उजुरी', formContent);
+    console.log('Modal opened, initializing components');
+    setTimeout(()=>{ 
+      try {
+        console.log('Initializing datepickers, dropdowns, and speech');
+        initializeDatepickers(); 
+        initializeNepaliDropdowns(); 
+        initializeFieldSpeech(); 
+        console.log('All components initialized successfully');
+      } catch(e) {
+        console.error('Error initializing components:', e);
+      }
+    }, 100);
+  } catch (error) {
+    console.error('Error in showNewHotlineComplaint:', error);
+    showToast('उजुरी फारम खोल्न सकिएन', 'error');
+  }
 }
 
 async function saveHotlineComplaint() {
@@ -18224,19 +18285,59 @@ const fieldSpeechState = {};
 
 function initializeFieldSpeech() {
   try {
+    console.log('initializeFieldSpeech called');
     const descBtn = document.getElementById('descVoiceBtn');
     const commBtn = document.getElementById('committeeVoiceBtn');
     const hsDescBtn = document.getElementById('hsDescVoiceBtn');
+    const hlDescBtn = document.getElementById('hlDescVoiceBtn');
     const editDecisionBtn = document.getElementById('editDecisionVoiceBtn');
     const editDescBtn = document.getElementById('editDescVoiceBtn');
     const editCommitteeBtn = document.getElementById('editCommitteeVoiceBtn');
-    if (descBtn) descBtn.addEventListener('click', () => toggleFieldSpeech('complaintDescription', 'descVoiceBtn'));
-    if (commBtn) commBtn.addEventListener('click', () => toggleFieldSpeech('committeeDecision', 'committeeVoiceBtn'));
-    if (hsDescBtn) hsDescBtn.addEventListener('click', () => toggleFieldSpeech('hsDescription', 'hsDescVoiceBtn'));
-    if (editDecisionBtn) editDecisionBtn.addEventListener('click', () => toggleFieldSpeech('editDecision', 'editDecisionVoiceBtn'));
-    if (editDescBtn) editDescBtn.addEventListener('click', () => toggleFieldSpeech('editDescription', 'editDescVoiceBtn'));
-    if (editCommitteeBtn) editCommitteeBtn.addEventListener('click', () => toggleFieldSpeech('editCommitteeDecision', 'editCommitteeVoiceBtn'));
-  } catch (e) { console.warn('initializeFieldSpeech failed', e); }
+    
+    console.log('Found voice buttons:', {
+      descBtn: !!descBtn,
+      commBtn: !!commBtn,
+      hsDescBtn: !!hsDescBtn,
+      hlDescBtn: !!hlDescBtn,
+      editDecisionBtn: !!editDecisionBtn,
+      editDescBtn: !!editDescBtn,
+      editCommitteeBtn: !!editCommitteeBtn
+    });
+    
+    if (descBtn) {
+      descBtn.addEventListener('click', () => toggleFieldSpeech('complaintDescription', 'descVoiceBtn'));
+      console.log('Added listener to descBtn');
+    }
+    if (commBtn) {
+      commBtn.addEventListener('click', () => toggleFieldSpeech('committeeDecision', 'committeeVoiceBtn'));
+      console.log('Added listener to commBtn');
+    }
+    if (hsDescBtn) {
+      hsDescBtn.addEventListener('click', () => toggleFieldSpeech('hsDescription', 'hsDescVoiceBtn'));
+      console.log('Added listener to hsDescBtn');
+    }
+    if (hlDescBtn) {
+      hlDescBtn.addEventListener('click', () => toggleFieldSpeech('hlDescription', 'hlDescVoiceBtn'));
+      console.log('Added listener to hlDescBtn');
+    }
+    if (editDecisionBtn) {
+      editDecisionBtn.addEventListener('click', () => toggleFieldSpeech('editDecision', 'editDecisionVoiceBtn'));
+      console.log('Added listener to editDecisionBtn');
+    }
+    if (editDescBtn) {
+      editDescBtn.addEventListener('click', () => toggleFieldSpeech('editDescription', 'editDescVoiceBtn'));
+      console.log('Added listener to editDescBtn');
+    }
+    if (editCommitteeBtn) {
+      editCommitteeBtn.addEventListener('click', () => toggleFieldSpeech('editCommitteeDecision', 'editCommitteeVoiceBtn'));
+      console.log('Added listener to editCommitteeBtn');
+    }
+    
+    console.log('initializeFieldSpeech completed successfully');
+  } catch (e) { 
+    console.error('initializeFieldSpeech failed:', e); 
+    // Don't show toast to avoid annoying users, just log the error
+  }
 }
 
 function toggleFieldSpeech(fieldId, btnId) {
@@ -18246,12 +18347,18 @@ function toggleFieldSpeech(fieldId, btnId) {
       return;
     }
     const key = fieldId;
-    if (!fieldSpeechState[key]) fieldSpeechState[key] = { recognition: null, listening: false };
+    if (!fieldSpeechState[key]) fieldSpeechState[key] = { recognition: null, listening: false, timeoutId: null };
     const state = fieldSpeechState[key];
     const btn = document.getElementById(btnId);
 
     if (state.listening) {
-      try { state.recognition.stop(); } catch (e) {}
+      try { 
+        if (state.timeoutId) {
+          clearTimeout(state.timeoutId);
+          state.timeoutId = null;
+        }
+        state.recognition.stop(); 
+      } catch (e) {}
       state.listening = false;
       if (btn) { btn.classList.remove('listening'); btn.innerHTML = '<i class="fas fa-microphone"></i> आवाज टाइप'; }
       return;
@@ -18259,13 +18366,26 @@ function toggleFieldSpeech(fieldId, btnId) {
 
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     const recog = new SpeechRecognition();
-    recog.continuous = false;
+    recog.continuous = true; // Keep listening continuously
     recog.interimResults = true;
     recog.lang = 'ne-NP';
+
+    // Function to reset the 3-second timeout
+    const resetTimeout = () => {
+      if (state.timeoutId) {
+        clearTimeout(state.timeoutId);
+      }
+      state.timeoutId = setTimeout(() => {
+        console.log('3 seconds of silence detected, stopping speech recognition');
+        try { recog.stop(); } catch (e) {}
+      }, 3000); // 3 seconds timeout
+    };
 
     recog.onstart = () => {
       state.listening = true;
       if (btn) { btn.classList.add('listening'); btn.innerHTML = '<i class="fas fa-stop"></i> रोक्नुहोस्'; }
+      // Start the initial timeout
+      resetTimeout();
     };
 
     let interim = '';
@@ -18273,14 +18393,27 @@ function toggleFieldSpeech(fieldId, btnId) {
       try {
         let finalTranscript = '';
         interim = '';
+        let hasSpeech = false;
+        
         for (let i = 0; i < ev.results.length; i++) {
           const res = ev.results[i];
-          if (res.isFinal) finalTranscript += res[0].transcript;
-          else interim += res[0].transcript;
+          if (res.isFinal) {
+            finalTranscript += res[0].transcript;
+            hasSpeech = true;
+          } else {
+            interim += res[0].transcript;
+            hasSpeech = true;
+          }
         }
+        
+        // Reset timeout whenever speech is detected (final or interim)
+        if (hasSpeech) {
+          resetTimeout();
+        }
+        
         const field = document.getElementById(fieldId);
         if (field) {
-          // Append interim/final without losing existing content; only commit final segments
+          // Append final results without losing existing content
           if (finalTranscript && finalTranscript.trim().length > 0) {
             field.value = (field.value ? field.value + ' ' : '') + finalTranscript.trim();
           }
@@ -18291,12 +18424,21 @@ function toggleFieldSpeech(fieldId, btnId) {
     recog.onerror = (ev) => {
       console.error('Field speech error', ev);
       showToast('आवाज पहिचानमा समस्या भयो', 'error');
+      if (state.timeoutId) {
+        clearTimeout(state.timeoutId);
+        state.timeoutId = null;
+      }
       try { recog.stop(); } catch (e) {}
       state.listening = false;
       if (btn) { btn.classList.remove('listening'); btn.innerHTML = '<i class="fas fa-microphone"></i> आवाज टाइप'; }
     };
 
     recog.onend = () => {
+      // Clear timeout when recognition ends
+      if (state.timeoutId) {
+        clearTimeout(state.timeoutId);
+        state.timeoutId = null;
+      }
       state.listening = false;
       if (btn) { btn.classList.remove('listening'); btn.innerHTML = '<i class="fas fa-microphone"></i> आवाज टाइप'; }
     };

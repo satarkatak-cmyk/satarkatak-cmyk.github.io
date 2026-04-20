@@ -844,8 +844,10 @@
             contentArea.addEventListener('click', function(e) {
                 // Check if clicked element is inside an action button
                 const btn = e.target.closest('.action-btn');
-                if (btn && !btn.onclick) {
-                    // If button exists but has no inline handler, try to handle it here
+                if (btn) {
+                    // Handle all action buttons through event delegation
+                    e.preventDefault();
+                    e.stopPropagation();
                     if (typeof handleTableActions === 'function') {
                         handleTableActions(e);
                     }
