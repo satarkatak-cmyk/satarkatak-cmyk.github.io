@@ -5710,29 +5710,7 @@ function exportShakhaDetails(shakha) {
   exportReportToExcel(data, `${shakha}_उजुरीहरू`);
 }
 
-function openModal(title, content) {
-  if (window.NVC && NVC.UI && typeof NVC.UI.openModalContent === 'function') return NVC.UI.openModalContent.apply(this, arguments);
-  try {
-    document.getElementById('modalTitle').textContent = title;
-    document.getElementById('modalBody').innerHTML = content;
-    document.getElementById('complaintModal').classList.remove('hidden');
-    // mark modal open timestamp to avoid immediate-close race with other handlers
-    try { window._nvc_modalJustOpened = Date.now(); } catch (e) {}
-    // Force modal to be visible
-    try {
-      const modal = document.getElementById('complaintModal');
-      if (modal) {
-        modal.style.setProperty('opacity', '1', 'important');
-        modal.style.setProperty('visibility', 'visible', 'important');
-        const modalContent = modal.querySelector('.modal-content');
-        if (modalContent) {
-          modalContent.style.setProperty('opacity', '1', 'important');
-        }
-      }
-    } catch(e) {}
-    if (typeof applyDevanagariDigits === 'function') applyDevanagariDigits(document.getElementById('complaintModal'));
-  } catch (e) { console.error('openModal fallback failed', e); }
-}
+// Duplicate openModal function removed - now using modalManager.openModal()
 
 function _closeModal() {
   try {
@@ -5754,41 +5732,8 @@ function _closeModal() {
 
 NVC.UI.closeModal = _closeModal;
 
-function closeModal() {
-  try { 
-    console.log('[global closeModal] called, args=', arguments); 
-    console.log('[global closeModal] stack trace:', (new Error()).stack);
-  } catch(e){}
-  try {
-    const id = arguments && arguments.length > 0 ? arguments[0] : null;
-    let el = null;
-    if (id) el = document.getElementById(id);
-    if (!el) el = document.querySelector('.modal:not(.hidden)') || document.getElementById('complaintModal');
-    if (!el) return;
-    // Avoid closing immediately after opening (race with openModalContent handlers)
-    try {
-      const justOpened = window._nvc_modalJustOpened || 0;
-      const timeDiff = Date.now() - justOpened;
-      console.log('[global closeModal] timeSinceOpen:', timeDiff);
-      if (justOpened && timeDiff < 500) {
-        console.log('[global closeModal] ignored due to recent open (<500ms)');
-        // clear flag after ignoring once so future closes work
-        try { delete window._nvc_modalJustOpened; } catch(e){}
-        return;
-      }
-    } catch (e) {}
-    console.log('[global closeModal] hiding element', el);
-    try { el.classList.add('hidden'); } catch(e) {}
-    try { 
-      // Remove any inline properties that may keep the modal visible
-      el.style.removeProperty('display'); el.style.removeProperty('visibility'); el.style.removeProperty('opacity'); el.style.removeProperty('z-index'); 
-      // Force-hide with inline important styles to override any previously set important rules
-      try { el.style.setProperty('display', 'none', 'important'); el.style.setProperty('visibility', 'hidden', 'important'); el.style.setProperty('opacity', '0', 'important'); } catch (e) {}
-    } catch(e) {}
-  } catch (e) { console.warn('[global closeModal] error', e); }
-}
+// Duplicate closeModal function removed - now using modalManager.closeModal()
 
-// Robust modal close helper: try framework close, then global close, and repeat after a short delay
 function closeModalRobust() {
   try {
     try { if (window.NVC && NVC.UI && typeof NVC.UI.closeModal === 'function') NVC.UI.closeModal(); else if (typeof closeModal === 'function') closeModal(); } catch(e) {}
@@ -18347,18 +18292,12 @@ function toggleFieldSpeech(fieldId, btnId) {
       return;
     }
     const key = fieldId;
-    if (!fieldSpeechState[key]) fieldSpeechState[key] = { recognition: null, listening: false, timeoutId: null };
+    if (!fieldSpeechState[key]) fieldSpeechState[key] = { recognition: null, listening: false };
     const state = fieldSpeechState[key];
     const btn = document.getElementById(btnId);
 
     if (state.listening) {
-      try { 
-        if (state.timeoutId) {
-          clearTimeout(state.timeoutId);
-          state.timeoutId = null;
-        }
-        state.recognition.stop(); 
-      } catch (e) {}
+      try { state.recognition.stop(); } catch (e) {}
       state.listening = false;
       if (btn) { btn.classList.remove('listening'); btn.innerHTML = '<i class="fas fa-microphone"></i> आवाज टाइप'; }
       return;
@@ -18366,26 +18305,13 @@ function toggleFieldSpeech(fieldId, btnId) {
 
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     const recog = new SpeechRecognition();
-    recog.continuous = true; // Keep listening continuously
+    recog.continuous = false;
     recog.interimResults = true;
     recog.lang = 'ne-NP';
-
-    // Function to reset the 3-second timeout
-    const resetTimeout = () => {
-      if (state.timeoutId) {
-        clearTimeout(state.timeoutId);
-      }
-      state.timeoutId = setTimeout(() => {
-        console.log('3 seconds of silence detected, stopping speech recognition');
-        try { recog.stop(); } catch (e) {}
-      }, 3000); // 3 seconds timeout
-    };
 
     recog.onstart = () => {
       state.listening = true;
       if (btn) { btn.classList.add('listening'); btn.innerHTML = '<i class="fas fa-stop"></i> रोक्नुहोस्'; }
-      // Start the initial timeout
-      resetTimeout();
     };
 
     let interim = '';
@@ -18393,27 +18319,14 @@ function toggleFieldSpeech(fieldId, btnId) {
       try {
         let finalTranscript = '';
         interim = '';
-        let hasSpeech = false;
-        
         for (let i = 0; i < ev.results.length; i++) {
           const res = ev.results[i];
-          if (res.isFinal) {
-            finalTranscript += res[0].transcript;
-            hasSpeech = true;
-          } else {
-            interim += res[0].transcript;
-            hasSpeech = true;
-          }
+          if (res.isFinal) finalTranscript += res[0].transcript;
+          else interim += res[0].transcript;
         }
-        
-        // Reset timeout whenever speech is detected (final or interim)
-        if (hasSpeech) {
-          resetTimeout();
-        }
-        
         const field = document.getElementById(fieldId);
         if (field) {
-          // Append final results without losing existing content
+          // Append interim/final without losing existing content; only commit final segments
           if (finalTranscript && finalTranscript.trim().length > 0) {
             field.value = (field.value ? field.value + ' ' : '') + finalTranscript.trim();
           }
@@ -18424,21 +18337,12 @@ function toggleFieldSpeech(fieldId, btnId) {
     recog.onerror = (ev) => {
       console.error('Field speech error', ev);
       showToast('आवाज पहिचानमा समस्या भयो', 'error');
-      if (state.timeoutId) {
-        clearTimeout(state.timeoutId);
-        state.timeoutId = null;
-      }
       try { recog.stop(); } catch (e) {}
       state.listening = false;
       if (btn) { btn.classList.remove('listening'); btn.innerHTML = '<i class="fas fa-microphone"></i> आवाज टाइप'; }
     };
 
     recog.onend = () => {
-      // Clear timeout when recognition ends
-      if (state.timeoutId) {
-        clearTimeout(state.timeoutId);
-        state.timeoutId = null;
-      }
       state.listening = false;
       if (btn) { btn.classList.remove('listening'); btn.innerHTML = '<i class="fas fa-microphone"></i> आवाज टाइप'; }
     };

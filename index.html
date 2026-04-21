@@ -573,7 +573,7 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title" id="modalTitle">मोडल</h5>
-                <button class="action-btn" onclick="closeModal()">
+                <button class="action-btn" onclick="modalManager.close()">
                     <i class="fas fa-times"></i>
                 </button>
             </div>
@@ -588,7 +588,7 @@
         <div class="modal-content" style="max-width: 700px;">
             <div class="modal-header">
                 <h5 class="modal-title">शाखा चयन गर्नुहोस्</h5>
-                <button class="action-btn" onclick="closeShakhaModal()">
+                <button class="action-btn" onclick="modalManager.close('shakhaModal')">
                     <i class="fas fa-times"></i>
                 </button>
             </div>
@@ -605,7 +605,7 @@
         <div class="modal-content" style="max-width: 500px;">
             <div class="modal-header">
                 <h5 class="modal-title">सेटिङहरू (Settings)</h5>
-                <button class="action-btn" onclick="closeSettingsModal()">
+                <button class="action-btn" onclick="modalManager.close('settingsModal')">
                     <i class="fas fa-times"></i>
                 </button>
             </div>
@@ -717,6 +717,14 @@
     <script src="ui.js" defer></script>
     <script src="main.js" defer></script>
     <script src="nepali-calendar-api.js" defer></script>
+    <!-- Load new optimization utilities before legacy code -->
+    <script src="dom-utils.js" defer></script>
+    <script src="modal-manager.js" defer></script>
+    <script src="event-manager.js" defer></script>
+    <script src="loading-manager.js" defer></script>
+    <script src="central-utils.js" defer></script>
+    <script src="ai-integration.js" defer></script>
+    <script src="date-integration.js" defer></script>
     <!-- Then load legacy bundle which expects globals above -->
     <script src="script.js" defer></script>
 
@@ -755,15 +763,9 @@
     }
 
     function saveSettings() {
-        closeSettingsModal();
-        if (typeof Toastify === 'function') {
-            Toastify({
-                text: "सेटिङहरू सफलतापूर्वक सेभ भयो!",
-                duration: 3000,
-                gravity: "top",
-                position: "right",
-                style: { background: "#28a745" }
-            }).showToast();
+        modalManager.close('settingsModal');
+        if (window.utils) {
+            window.utils.showToast("सेटिङहरू सफलतापूर्वक सेभ भयो!", 'success', 3000);
         } else {
             alert("सेटिङहरू सफलतापूर्वक सेभ भयो!");
         }
@@ -788,71 +790,10 @@
                 }
             });
         }
-    });
-</script>
-
-<!-- Fix for Action Buttons and Edit Logic (Added by AI) -->
-<script>
-    document.addEventListener('DOMContentLoaded', function() {
-        // १. Action बटनहरूको लागि Event Delegation
-        // यसले फिल्टर वा रिलोड पछि पनि बटनहरूले काम गर्ने सुनिश्चित गर्छ
-        const contentArea = document.getElementById('contentArea');
         
-        if (contentArea) {
-            contentArea.addEventListener('click', function(e) {
-                // Edit बटन क्लिक ह्यान्डल गर्ने
-                // बटनमा .btn-edit क्लास र data-id, data-json एट्रीब्युट हुनुपर्छ
-                const editBtn = e.target.closest('.btn-edit');
-                if (editBtn) {
-                    e.preventDefault();
-                    const id = editBtn.getAttribute('data-id');
-                    const rowData = editBtn.getAttribute('data-json'); // पूरा डाटा JSON स्ट्रिङको रूपमा
-                    
-                    if (id && typeof openEditModal === 'function') {
-                        openEditModal(id, rowData);
-                    } else {
-                        console.error("Error: ID missing or openEditModal function not found.");
-                        // यदि openEditModal छैन भने यहाँ फलब्याक लजिक लेख्न सकिन्छ
-                        // उदाहरण: populateForm(JSON.parse(rowData));
-                    }
-                }
-
-                // Delete बटन क्लिक ह्यान्डल गर्ने
-                const deleteBtn = e.target.closest('.btn-delete');
-                if (deleteBtn) {
-                    e.preventDefault();
-                    const id = deleteBtn.getAttribute('data-id');
-                    
-                    if (id && confirm('के तपाई यो उजुरी हटाउन चाहनुहुन्छ? यो कार्य फिर्ता लिन सकिँदैन।')) {
-                        if (typeof deleteComplaint === 'function') {
-                            deleteComplaint(id);
-                        } else {
-                            console.error("deleteComplaint function not found.");
-                        }
-                    }
-                }
-            });
-        }
-    });
-</script>
-
-<!-- Fix for Action Buttons (Event Delegation Backup) -->
-<script>
-    document.addEventListener('DOMContentLoaded', function() {
-        const contentArea = document.getElementById('contentArea');
-        if (contentArea) {
-            contentArea.addEventListener('click', function(e) {
-                // Check if clicked element is inside an action button
-                const btn = e.target.closest('.action-btn');
-                if (btn) {
-                    // Handle all action buttons through event delegation
-                    e.preventDefault();
-                    e.stopPropagation();
-                    if (typeof handleTableActions === 'function') {
-                        handleTableActions(e);
-                    }
-                }
-            });
+        // Initialize EventManager
+        if (window.eventManager) {
+            console.log('EventManager initialized successfully');
         }
     });
 </script>
