@@ -65,6 +65,22 @@
     });
   };
 
+  // Safe HTML escaper for attributes/values
+  NVC.Utils.escapeHtml = function(str){
+    try {
+      return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+    } catch (e) { return '' + (str || ''); }
+  };
+
+  // Try to parse JSON and return the array length (0 on failure)
+  NVC.Utils.tryParseJsonCount = function(str){
+    try {
+      if (!str && str !== 0) return 0;
+      const parsed = (typeof str === 'string') ? JSON.parse(str) : str;
+      return Array.isArray(parsed) ? parsed.length : 0;
+    } catch (e) { return 0; }
+  };
+
   // Apply Devanagari conversion to text nodes inside an element
   NVC.Utils.applyDevanagariDigits = function(root){
     try {

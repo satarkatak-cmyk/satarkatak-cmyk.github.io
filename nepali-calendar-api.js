@@ -30,7 +30,8 @@
         
         weekdays: ["आइत", "सोम", "मंगल", "बुध", "बिही", "शुक्र", "शनि"],
         
-        weekdaysShort: ["आ", "सो", "मं", "बु", "बि", "शु", "श"]
+        weekdaysShort: ["आ", "सो", "मं", "बु", "बि", "शु", "श"],
+        weekdaysFull: ["आइतबार", "सोमबार", "मंगलबार", "बुधबार", "बिहीबार", "शुक्रबार", "शनिबार"]
     };
 
     // Core Calendar API
@@ -143,6 +144,55 @@
             if (!this.isValidDate(year, month, day)) return null;
             
             return { year, month, day };
+        },
+
+        /**
+         * Get full Nepali weekday name from an AD Date or date string
+         * @param {Date|string} adDate
+         * @returns {string}
+         */
+        getWeekdayFullNameFromAD: function(adDate) {
+            try {
+                let d = adDate;
+                if (!(d instanceof Date)) d = new Date(d);
+                if (isNaN(d.getTime())) return '';
+                const idx = d.getDay();
+                return NEPALI_CALENDAR.weekdaysFull[idx] || '';
+            } catch (e) { return ''; }
+        },
+
+        /**
+         * Format a Nepali display string for UI: "YYYY MONTH D, WEEKDAY"
+         * Accepts BS string (YYYY-MM-DD), AD Date object, or nothing (current date)
+         */
+        formatDisplay: function(inputDate) {
+            try {
+                // If BS format
+                if (typeof inputDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(inputDate)) {
+                    const formatted = this.formatDate(inputDate, 'YYYY MMMM DD');
+                    const ad = this.parseComplaintRegDateToAD({ entryDate: inputDate });
+                    const weekday = ad ? this.getWeekdayFullNameFromAD(ad) : '';
+                    return weekday ? `${formatted}, ${weekday}` : formatted;
+                }
+
+                // If AD Date provided
+                if (inputDate instanceof Date) {
+                    const ad = inputDate;
+                    const bs = this.convertADtoBS(`${ad.getFullYear()}-${String(ad.getMonth()+1).padStart(2,'0')}-${String(ad.getDate()).padStart(2,'0')}`) || this.getCurrentDate();
+                    const formatted = this.formatDate(bs, 'YYYY MMMM DD');
+                    const weekday = this.getWeekdayFullNameFromAD(ad);
+                    return weekday ? `${formatted}, ${weekday}` : formatted;
+                }
+
+                // Default: current date
+                const cur = this.getCurrentDate();
+                const formatted = this.formatDate(cur, 'YYYY MMMM DD');
+                const adNow = this.parseComplaintRegDateToAD({ entryDate: cur });
+                const weekdayNow = adNow ? this.getWeekdayFullNameFromAD(adNow) : '';
+                return weekdayNow ? `${formatted}, ${weekdayNow}` : formatted;
+            } catch (e) {
+                return this.getCurrentDate();
+            }
         },
 
         /**
@@ -732,6 +782,168 @@
         
         console.log('💡 Run testNepaliCalendar() or testNepaliCalender() in console to test');
     };
+
+    // -------------------- Compatibility helpers (migrated from script.js) --------------------
+    // Fallback function for Nepali date when libraries are missing
+    NepaliCalendar.getFallbackNepaliDate = function() {
+        const now = new Date();
+        const monthDays = [30, 31, 32, 31, 32, 30, 30, 29, 30, 29, 30, 30];
+        const nepaliMonths = ["बैशाख", "जेठ", "असार", "साउन", "भदौ", "असोज", "कार्तिक", "मंसिर", "पुष", "माघ", "फागुन", "चैत"];
+        const weekdays = ["आइतबार", "सोमबार", "मंगलबार", "बुधबार", "बिहीबार", "शुक्रबार", "शनिबार"];
+        // Reference date: 2025-02-16 = 2081-11-03 (approx)
+        const refAD = new Date(2025, 1, 16);
+        const refBS = { year: 2081, month: 11, day: 3 };
+        const diffTime = now - refAD;
+        const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+        let bsYear = refBS.year;
+        let bsMonth = refBS.month;
+        let bsDay = refBS.day + diffDays;
+        while (bsDay > monthDays[bsMonth - 1]) {
+            bsDay -= monthDays[bsMonth - 1];
+            bsMonth++;
+            if (bsMonth > 12) { bsMonth = 1; bsYear++; }
+        }
+        while (bsDay < 1) {
+            bsMonth--;
+            if (bsMonth < 1) { bsMonth = 12; bsYear--; }
+            bsDay += monthDays[bsMonth - 1];
+        }
+        const monthName = nepaliMonths[bsMonth - 1] || "बैशाख";
+        const dayName = weekdays[now.getDay()];
+        return `${bsYear} ${monthName} ${bsDay}, ${dayName}`;
+    };
+
+    // Accurate AD -> BS conversion (copied from script.js)
+    NepaliCalendar.convertADtoBSAccurate = function(adDateStr) {
+        try {
+            if (!adDateStr || adDateStr === 'undefined' || adDateStr === '') return '';
+            const m = String(adDateStr).trim().match(/(\d{4})-(\d{1,2})-(\d{1,2})/);
+            if (m) {
+                const parts = [Number(m[1]), Number(m[2]), Number(m[3])];
+                if (parts.every(n => !isNaN(n))) {
+                    const adYear = parts[0];
+                    const adMonth = parts[1];
+                    const adDay = parts[2];
+                    let bsYear = adYear + 56;
+                    let bsMonth = adMonth + 8;
+                    let bsDay = adDay + 17;
+                    if (bsDay > 30) { bsDay -= 30; bsMonth++; }
+                    if (bsMonth > 12) { bsMonth -= 12; bsYear++; }
+                    return `${bsYear}-${String(bsMonth).padStart(2,'0')}-${String(bsDay).padStart(2,'0')}`;
+                }
+            }
+            return NepaliCalendar.getFallbackNepaliDate();
+        } catch (e) {
+            return NepaliCalendar.getFallbackNepaliDate();
+        }
+    };
+
+    // Simple wrapper: convert AD to BS using accurate method
+    NepaliCalendar.convertADtoBS = function(adDateStr) {
+        if (!adDateStr) return '';
+        try {
+            const m = String(adDateStr).trim().match(/(\d{4})-(\d{1,2})-(\d{1,2})/);
+            if (m) {
+                const y = Number(m[1]);
+                if (y >= 2050) return `${m[1]}-${String(m[2]).padStart(2,'0')}-${String(m[3]).padStart(2,'0')}`;
+                const parts = [Number(m[1]), Number(m[2]), Number(m[3])];
+                if (parts.every(n => !isNaN(n))) return NepaliCalendar.convertADtoBSAccurate(`${m[1]}-${String(m[2]).padStart(2,'0')}-${String(m[3]).padStart(2,'0')}`);
+            }
+        } catch (e) { /* ignore */ }
+        return '';
+    };
+
+    // Normalize Nepali display to ISO YYYY-MM-DD (copied/adapted)
+    NepaliCalendar.normalizeNepaliDisplayToISO = function(raw) {
+        if (!raw) return '';
+        let s = String(raw).trim();
+        // convert devanagari digits to latin if helper exists
+        try { if (window.NVC && NVC.Utils && typeof NVC.Utils.devanagariToLatin === 'function') s = NVC.Utils.devanagariToLatin(s); } catch(e){}
+        const dashMatch = s.match(/(\d{4})\D(\d{1,2})\D(\d{1,2})/);
+        if (dashMatch) {
+            const y = dashMatch[1]; const mo = String(dashMatch[2]).padStart(2,'0'); const d = String(dashMatch[3]).padStart(2,'0');
+            return `${y}-${mo}-${d}`;
+        }
+        const tokens = s.split(/\s+/).filter(Boolean);
+        if (tokens.length >= 2) {
+            const yearToken = tokens[0].replace(/[^0-9]/g, '');
+            let monthToken = tokens[1].replace(/[^\u0900-\u097Fa-zA-Z]/g, '');
+            let dayToken = '';
+            for (let i=2;i<tokens.length;i++) { const t = tokens[i].replace(/[,\s]/g,''); if (t.match(/\d/)) { dayToken = t.replace(/[^0-9]/g,''); break; } }
+            if (!dayToken && tokens[2] && tokens[2].match(/\d/)) dayToken = tokens[2].replace(/[^0-9]/g,'');
+            const monthNumber = (window.NepaliCalendar && typeof window.NepaliCalendar.getMonthName === 'function') ? (function(mtok){
+                // attempt to map month name -> number
+                const map = { 'बैशाख':1,'जेठ':2,'असार':3,'साउन':4,'भदौ':5,'असोज':6,'कार्तिक':7,'मंसिर':8,'पुष':9,'माघ':10,'फागुन':11,'चैत':12 };
+                return map[mtok] || (mtok.match(/\d+/) ? Number(mtok) : null);
+            })(monthToken) : null;
+            if (yearToken && monthNumber && dayToken) return `${yearToken}-${String(monthNumber).padStart(2,'0')}-${String(dayToken).padStart(2,'0')}`;
+        }
+        const digits = s.replace(/[^0-9]/g,'');
+        if (digits.length === 8) return `${digits.slice(0,4)}-${digits.slice(4,6)}-${digits.slice(6,8)}`;
+        return s;
+    };
+
+    // Parse complaint registration date into an AD Date object when possible
+    NepaliCalendar.parseComplaintRegDateToAD = function(complaint) {
+        if (!complaint) return null;
+        const raw = complaint.entryDate || complaint.date || complaint['दर्ता मिति'] || complaint['Entry Date'] || complaint.createdAt || '';
+        if (!raw) return null;
+        const iso = NepaliCalendar.normalizeNepaliDisplayToISO(raw);
+        if (!iso) return null;
+        const m = String(iso).match(/^(\d{4})-(\d{2})-(\d{2})$/);
+        if (!m) {
+            const d = new Date(iso);
+            return isNaN(d.getTime()) ? null : d;
+        }
+        const y = Number(m[1]); const mo = Number(m[2]); const da = Number(m[3]);
+        if (!y || !mo || !da) return null;
+        const looksBS = y >= 2050;
+        if (looksBS) {
+            try {
+                if (typeof NepaliFunctions !== 'undefined' && typeof NepaliFunctions.BS2AD === 'function') {
+                    const adStr = NepaliFunctions.BS2AD(y, mo, da);
+                    const d = new Date(NepaliCalendar.normalizeNepaliDisplayToISO(adStr));
+                    return isNaN(d.getTime()) ? null : d;
+                }
+                if (typeof NepaliDatePicker !== 'undefined' && typeof NepaliDatePicker.bs2ad === 'function') {
+                    const adStr = NepaliDatePicker.bs2ad(`${y}-${String(mo).padStart(2,'0')}-${String(da).padStart(2,'0')}`);
+                    const d = new Date(NepaliCalendar.normalizeNepaliDisplayToISO(adStr));
+                    return isNaN(d.getTime()) ? null : d;
+                }
+                // Approximate fallback using reference
+                const refBS = new Date(2081, 0, 1);
+                const refAD = new Date(2024, 3, 13);
+                const bsDate = new Date(y, mo - 1, da);
+                const diffDays = Math.floor((bsDate - refBS) / (1000 * 60 * 60 * 24));
+                const approxAD = new Date(refAD.getTime() + diffDays * 24 * 60 * 60 * 1000);
+                return isNaN(approxAD.getTime()) ? null : approxAD;
+            } catch (e) { return null; }
+        }
+        const d = new Date(`${m[1]}-${m[2]}-${m[3]}T00:00:00`);
+        return isNaN(d.getTime()) ? null : d;
+    };
+
+    // Ensure BS date: normalize and convert AD to BS when needed
+    NepaliCalendar.ensureBSDate = function(raw) {
+        if (!raw) return '';
+        let s = String(raw).trim();
+        if (/[\u0900-\u097F]/.test(s) || /[बैशाख|जेठ|फागुन|चैत]/.test(s)) {
+            const normalized = NepaliCalendar.normalizeNepaliDisplayToISO(s);
+            if (normalized) return normalized;
+        }
+        const isoMatch = s.match(/(\d{4})-(\d{1,2})-(\d{1,2})/);
+        if (isoMatch) {
+            const year = Number(isoMatch[1]);
+            if (year >= 2050) return `${isoMatch[1]}-${String(isoMatch[2]).padStart(2,'0')}-${String(isoMatch[3]).padStart(2,'0')}`;
+            const converted = NepaliCalendar.convertADtoBS(s);
+            return converted || `${isoMatch[1]}-${String(isoMatch[2]).padStart(2,'0')}-${String(isoMatch[3]).padStart(2,'0')}`;
+        }
+        const digits = s.replace(/[^0-9]/g,'');
+        if (digits.length === 8) return `${digits.slice(0,4)}-${digits.slice(4,6)}-${digits.slice(6,8)}`;
+        return s;
+    };
+
+    // Legacy global aliases have been removed — callers should use `NepaliCalendar`.
 
     // Initialize Nepali Calendar API when DOM is ready
     document.addEventListener('DOMContentLoaded', function() {

@@ -13,15 +13,17 @@ function elVal(id) {
 
 // Loading Spinner Functions
 function showLoadingSpinner(statusText = 'सेभ हुँदैछ...') {
-    const spinner = document.getElementById('loadingSpinner');
-    const statusTextElement = document.getElementById('loadingStatusText');
-    
-    if (spinner && statusTextElement) {
-        statusTextElement.textContent = statusText;
-        spinner.style.display = 'flex';
-        // Prevent body scroll when spinner is shown
-        document.body.style.overflow = 'hidden';
-    }
+  try {
+    if (window.NVC && NVC.UI && typeof NVC.UI.showLoadingSpinner === 'function') return NVC.UI.showLoadingSpinner(statusText);
+  } catch (e) {}
+  // Fallback
+  const spinner = document.getElementById('loadingSpinner');
+  const statusTextElement = document.getElementById('loadingStatusText');
+  if (spinner && statusTextElement) {
+    statusTextElement.textContent = statusText;
+    spinner.style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+  }
 }
 
 function filterHotlineComplaints() {
@@ -79,13 +81,9 @@ function showHotlineComplaintsView(initialFilters = {}) {
 }
 
 function hideLoadingSpinner() {
-    const spinner = document.getElementById('loadingSpinner');
-    
-    if (spinner) {
-        spinner.style.display = 'none';
-        // Restore body scroll
-        document.body.style.overflow = '';
-    }
+  try { if (window.NVC && NVC.UI && typeof NVC.UI.hideLoadingSpinner === 'function') return NVC.UI.hideLoadingSpinner(); } catch(e){}
+  const spinner = document.getElementById('loadingSpinner');
+  if (spinner) { spinner.style.display = 'none'; document.body.style.overflow = ''; }
 }
 
 // Helper to clean up date display (remove time and fix timezone issues)
@@ -119,11 +117,9 @@ function cleanDateDisplay(dateStr) {
 }
 
 function updateLoadingStatus(statusText) {
-    const statusTextElement = document.getElementById('loadingStatusText');
-    
-    if (statusTextElement) {
-        statusTextElement.textContent = statusText;
-    }
+  try { if (window.NVC && NVC.UI && typeof NVC.UI.updateLoadingStatus === 'function') return NVC.UI.updateLoadingStatus(statusText); } catch(e){}
+  const statusTextElement = document.getElementById('loadingStatusText');
+  if (statusTextElement) statusTextElement.textContent = statusText;
 }
 
 // Ministries data
@@ -920,15 +916,14 @@ function populateLocalLevels() {
 }
 
 function addEmployeeRow(type) {
+  try { if (window.NVC && NVC.UI && typeof NVC.UI.addEmployeeRow === 'function') return NVC.UI.addEmployeeRow(type); } catch(e){}
   const container = document.getElementById(`${type}EmployeesContainer`);
   if (!container) return;
-  
   const rowId = `${type}_${Date.now()}`;
   const row = document.createElement('div');
   row.className = 'd-grid gap-2 mb-2';
   row.id = rowId;
   row.style.cssText = 'grid-template-columns: 2fr 1fr 1fr auto; padding: 8px; border: 1px solid #dee2e6; border-radius: 4px; background: #f8f9fa;';
-  
   row.innerHTML = `
     <input type="text" id="employee_name_${rowId}" name="employee_name" class="form-control" placeholder="कर्मचारीको नाम" data-field="name" />
     <input type="text" id="employee_post_${rowId}" name="employee_post" class="form-control" placeholder="पद" data-field="post" />
@@ -937,43 +932,35 @@ function addEmployeeRow(type) {
       <i class="fas fa-trash"></i>
     </button>
   `;
-  
   container.appendChild(row);
 }
 
 function removeEmployeeRow(rowId) {
+  try { if (window.NVC && NVC.UI && typeof NVC.UI.removeEmployeeRow === 'function') return NVC.UI.removeEmployeeRow(rowId); } catch(e){}
   const row = document.getElementById(rowId);
-  if (row) {
-    row.remove();
-  }
+  if (row) row.remove();
 }
 
 function getEmployeeData(type) {
+  try { if (window.NVC && NVC.UI && typeof NVC.UI.getEmployeeData === 'function') return NVC.UI.getEmployeeData(type); } catch(e){}
   const container = document.getElementById(`${type}EmployeesContainer`);
   if (!container) return [];
-  
   const employees = [];
   const rows = container.querySelectorAll('[id^="' + type + '_"]');
-  
   rows.forEach(row => {
     const nameInput = row.querySelector('input[data-field="name"]');
     const postInput = row.querySelector('input[data-field="post"]');
     const symbolInput = row.querySelector('input[data-field="symbol"]');
-    
     if (nameInput && nameInput.value.trim()) {
-      employees.push({
-        name: nameInput.value.trim(),
-        post: postInput ? postInput.value.trim() : '',
-        symbol: symbolInput ? symbolInput.value.trim() : ''
-      });
+      employees.push({ name: nameInput.value.trim(), post: postInput ? postInput.value.trim() : '', symbol: symbolInput ? symbolInput.value.trim() : '' });
     }
   });
-  
   return employees;
 }
 
 // Helper: add a prefilled employee row into a specific container id
 function addEmployeeRowTo(containerId, data = {}) {
+  try { if (window.NVC && NVC.UI && typeof NVC.UI.addEmployeeRowTo === 'function') return NVC.UI.addEmployeeRowTo(containerId, data); } catch(e){}
   const container = document.getElementById(containerId);
   if (!container) return;
   const rowId = `${containerId}_${Date.now()}_${Math.floor(Math.random()*1000)}`;
@@ -981,25 +968,24 @@ function addEmployeeRowTo(containerId, data = {}) {
   row.className = 'd-grid gap-2 mb-2';
   row.id = rowId;
   row.style.cssText = 'grid-template-columns: 2fr 1fr 1fr auto; padding: 8px; border: 1px solid #dee2e6; border-radius: 4px; background: #f8f9fa;';
-
   const nameVal = data.name ? String(data.name) : '';
   const postVal = data.post ? String(data.post) : '';
   const symbolVal = data.symbol ? String(data.symbol) : '';
-
+  const esc = (window.NVC && NVC.Utils && typeof NVC.Utils.escapeHtml === 'function') ? NVC.Utils.escapeHtml : function(s){ return String(s||''); };
   row.innerHTML = `
-    <input type="text" id="employee_name_${rowId}" name="employee_name" class="form-control" placeholder="कर्मचारीको नाम" data-field="name" value="${escapeHtml(nameVal)}" />
-    <input type="text" id="employee_post_${rowId}" name="employee_post" class="form-control" placeholder="पद" data-field="post" value="${escapeHtml(postVal)}" />
-    <input type="text" id="employee_symbol_${rowId}" name="employee_symbol" class="form-control" placeholder="संकेत नं" data-field="symbol" value="${escapeHtml(symbolVal)}" />
+    <input type="text" id="employee_name_${rowId}" name="employee_name" class="form-control" placeholder="कर्मचारीको नाम" data-field="name" value="${esc(nameVal)}" />
+    <input type="text" id="employee_post_${rowId}" name="employee_post" class="form-control" placeholder="पद" data-field="post" value="${esc(postVal)}" />
+    <input type="text" id="employee_symbol_${rowId}" name="employee_symbol" class="form-control" placeholder="संकेत नं" data-field="symbol" value="${esc(symbolVal)}" />
     <button type="button" class="btn btn-sm btn-danger" onclick="document.getElementById('${rowId}').remove();">
       <i class="fas fa-trash"></i>
     </button>
   `;
-
   container.appendChild(row);
 }
 
 // Helper: read employee data from a specific container id
 function getEmployeeDataFrom(containerId) {
+  try { if (window.NVC && NVC.UI && typeof NVC.UI.getEmployeeDataFrom === 'function') return NVC.UI.getEmployeeDataFrom(containerId); } catch(e){}
   const container = document.getElementById(containerId);
   if (!container) return [];
   const employees = [];
@@ -1009,11 +995,7 @@ function getEmployeeDataFrom(containerId) {
     const postInput = row.querySelector('input[data-field="post"]');
     const symbolInput = row.querySelector('input[data-field="symbol"]');
     if (nameInput && nameInput.value.trim()) {
-      employees.push({ 
-        name: nameInput.value.trim(), 
-        post: postInput ? postInput.value.trim() : '',
-        symbol: symbolInput ? symbolInput.value.trim() : ''
-      });
+      employees.push({ name: nameInput.value.trim(), post: postInput ? postInput.value.trim() : '', symbol: symbolInput ? symbolInput.value.trim() : '' });
     }
   });
   return employees;
@@ -1021,16 +1003,13 @@ function getEmployeeDataFrom(containerId) {
 
 // Try to parse a JSON string and return the array length, otherwise 0
 function tryParseJsonCount(str) {
-  try {
-    if (!str) return 0;
-    const parsed = typeof str === 'string' ? JSON.parse(str) : str;
-    if (Array.isArray(parsed)) return parsed.length;
-    return 0;
-  } catch (e) { return 0; }
+  try { if (window.NVC && NVC.Utils && typeof NVC.Utils.tryParseJsonCount === 'function') return NVC.Utils.tryParseJsonCount(str); } catch(e){}
+  try { if (!str) return 0; const parsed = typeof str === 'string' ? JSON.parse(str) : str; if (Array.isArray(parsed)) return parsed.length; return 0; } catch (e) { return 0; }
 }
 
 // Simple HTML escaper for attribute insertion
 function escapeHtml(str) {
+  try { if (window.NVC && NVC.Utils && typeof NVC.Utils.escapeHtml === 'function') return NVC.Utils.escapeHtml(str); } catch(e){}
   return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 }
 
@@ -1233,7 +1212,8 @@ const LOCATION_FIELDS = {
 };
 
 // ==================== GLOBAL STATE ====================
-const state = (NVC.State.state = {
+// Merge the local initial state into any existing central `NVC.State.state`
+const state = (NVC.State.state = Object.assign(NVC.State.state || {}, {
   currentUser: null,
   currentPage: CONFIG.DEFAULT_PAGE,
   currentShakha: null,
@@ -1262,7 +1242,7 @@ const state = (NVC.State.state = {
   notificationFilter: 'all',
   chatContext: null, // च्याटको सन्दर्भ (context) राख्न
   projectChartFilter: { startDate: '', endDate: '' }
-});
+}));
 
 // Make state globally accessible as window.state for compatibility
 window.state = state;
@@ -1271,65 +1251,37 @@ window.state = state;
 NVC.State = NVC.State || {};
 NVC.State.state = state;
 
-// Set a state property and update window.state for compatibility
-NVC.State.set = function(key, value) {
+// Provide state helpers only if central ones are not already defined (avoid overwriting)
+NVC.State.set = NVC.State.set || function(key, value) {
   try {
     if (typeof key === 'object') {
-      // If key is an object, merge all properties
       Object.assign(state, key);
       Object.assign(window.state, key);
     } else {
-      // Single property
       state[key] = value;
       window.state[key] = value;
     }
-    
-    // Backup to localStorage for persistence
+
     if (key === 'complaints') {
-      try {
-        localStorage.setItem('nvc_complaints_backup', JSON.stringify(value));
-      } catch (e) {
-        console.warn('Failed to backup complaints to localStorage:', e);
-      }
+      try { localStorage.setItem('nvc_complaints_backup', JSON.stringify(value)); } catch (e) { console.warn('Failed to backup complaints to localStorage:', e); }
     }
-    
     console.log(`✅ NVC.State.set: ${key} updated with ${Array.isArray(value) ? value.length : typeof value} items`);
-  } catch (e) {
-    console.error('NVC.State.set failed:', e);
-  }
+  } catch (e) { console.error('NVC.State.set failed:', e); }
 };
 
-// Get a state property
-NVC.State.get = function(key) {
-  try {
-    return state[key];
-  } catch (e) {
-    console.error('NVC.State.get failed:', e);
-    return undefined;
-  }
+// Get a state property (guarded)
+NVC.State.get = NVC.State.get || function(key) {
+  try { return state[key]; } catch (e) { console.error('NVC.State.get failed:', e); return undefined; }
 };
 
-// Push to an array state property
-NVC.State.push = function(key, item) {
+// Push to an array state property (guarded)
+NVC.State.push = NVC.State.push || function(key, item) {
   try {
-    if (!Array.isArray(state[key])) {
-      state[key] = [];
-      window.state[key] = [];
-    }
+    if (!Array.isArray(state[key])) { state[key] = []; window.state[key] = []; }
     state[key].unshift(item);
     window.state[key].unshift(item);
-    
-    // Backup to localStorage
-    if (key === 'complaints') {
-      try {
-        localStorage.setItem('nvc_complaints_backup', JSON.stringify(state[key]));
-      } catch (e) {
-        console.warn('Failed to backup complaints to localStorage:', e);
-      }
-    }
-  } catch (e) {
-    console.error('NVC.State.push failed:', e);
-  }
+    if (key === 'complaints') { try { localStorage.setItem('nvc_complaints_backup', JSON.stringify(state[key])); } catch (e) { console.warn('Failed to backup complaints to localStorage:', e); } }
+  } catch (e) { console.error('NVC.State.push failed:', e); }
 };
 
 // ==================== GLOBAL CHART STORAGE ====================
@@ -1340,37 +1292,8 @@ window.nvcCharts = {};
 
 // नेपाली मिति API प्रयोग गरेर आजको मिति प्राप्त गर्ने
 function _getCurrentNepaliDateLegacy() {
-    // फारमको लागि नेपाली मिति YYYY-MM-DD format मा
-    if (typeof NepaliDatePicker !== 'undefined' && NepaliDatePicker.ad2bs) {
-        try {
-            const today = new Date();
-            const year = today.getFullYear();
-            const month = String(today.getMonth() + 1).padStart(2, '0');
-            const day = String(today.getDate()).padStart(2, '0');
-            const adDateStr = `${year}-${month}-${day}`;
-            const bsDateStr = NepaliDatePicker.ad2bs(adDateStr);
-            if (bsDateStr) {
-                // bsDateStr यसरी आउँछ: "YYYY-MM-DD"
-                return bsDateStr;
-            }
-        } catch (e) {
-            console.warn('NepaliDatePicker.ad2bs failed in getCurrentNepaliDate', e);
-        }
-    }
-    // Check for NepaliFunctions (v5.x) - index.html मा v5 लोड भएकोले यो आवश्यक छ
-    if (typeof NepaliFunctions !== 'undefined' && NepaliFunctions.AD2BS) {
-        try {
-            const dt = new Date();
-            const bs = NepaliFunctions.AD2BS({ year: dt.getFullYear(), month: dt.getMonth() + 1, day: dt.getDate() });
-            if (bs) {
-                return `${bs.year}-${String(bs.month).padStart(2, '0')}-${String(bs.day).padStart(2, '0')}`;
-            }
-        } catch (e) {
-            console.warn('NepaliFunctions.AD2BS failed', e);
-        }
-    }
-    // Fallback: आजको AD date (for backend)
-    return new Date().toISOString().slice(0, 10);
+  // Authoritative single source: NepaliCalendar
+  try { return NepaliCalendar.getCurrentDate(); } catch (e) { console.error('NepaliCalendar.getCurrentDate missing', e); return ''; }
 }
 
 try { NVC.Utils.getCurrentNepaliDateLegacy = _getCurrentNepaliDateLegacy; } catch (e) {}
@@ -1572,69 +1495,17 @@ function _getCurrentNepaliDate() {
 NVC.Utils.getCurrentNepaliDate = _getCurrentNepaliDate;
 
 function getCurrentNepaliDate() {
-  // Use new Nepali Calendar API for reliable date handling
-  try {
-    if (window.NepaliCalendar && typeof window.NepaliCalendar.getCurrentDate === 'function') {
-      return window.NepaliCalendar.getCurrentDate();
-    }
-  } catch (e) {
-    console.warn('NepaliCalendar API failed, falling back to legacy method');
-  }
-  
-  // Fallback to legacy method if API not available
-  try {
-    if (window.NVC && NVC.Utils && typeof NVC.Utils.getCurrentNepaliDate === 'function') {
-      return NVC.Utils.getCurrentNepaliDate.apply(this, arguments);
-    }
-  } catch (e) {}
-  
-  // Final fallback
-  try { return _getCurrentNepaliDate.apply(this, arguments); } catch (e) { 
-    // Return current date in BS format as last resort
-    const today = new Date();
-    const bsYear = today.getFullYear() + 57;
-    const bsMonth = String(today.getMonth() + 1).padStart(2, '0');
-    const bsDay = String(today.getDate()).padStart(2, '0');
-    return `${bsYear}-${bsMonth}-${bsDay}`;
-  }
+  try { return NepaliCalendar.getCurrentDate(); } catch (e) { console.error('NepaliCalendar.getCurrentDate missing', e); return ''; }
 }
 
 // Format a Nepali display string matching homepage (e.g. "2080 बैशाख १५, सोमबार")
 function formatNepaliDisplay(inputDate) {
   try {
-    // Determine BS date string (YYYY-MM-DD) and AD Date for weekday
-    let bsStr = null;
-    let adDate = null;
-
-    if (!inputDate) {
-      bsStr = getCurrentNepaliDate();
-      adDate = new Date();
-    } else if (typeof inputDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(inputDate)) {
-      bsStr = inputDate;
-      // Try to derive weekday from corresponding AD date if possible
-      try { adDate = convertBStoAD(inputDate); } catch (e) { adDate = new Date(); }
-    } else if (inputDate instanceof Date) {
-      adDate = inputDate;
-      try { bsStr = convertADtoBS(`${adDate.getFullYear()}-${String(adDate.getMonth() + 1).padStart(2,'0')}-${String(adDate.getDate()).padStart(2,'0')}`); } catch (e) { bsStr = getCurrentNepaliDate(); }
-    } else {
-      bsStr = getCurrentNepaliDate();
-      adDate = new Date();
-    }
-
-    const parts = (bsStr || '').split('-');
-    const bsYear = parts[0] || '';
-    const bsMonth = parseInt(parts[1] || '1', 10) - 1;
-    const bsDay = parseInt(parts[2] || '1', 10);
-
-    const nepaliMonths = ["बैशाख","जेठ","असार","साउन","भदौ","असोज","कार्तिक","मंसिर","पुष","माघ","फागुन","चैत"];
-    const weekdays = ["आइतबार","सोमबार","मंगलबार","बुधबार","बिहीबार","शुक्रबार","शनिबार"];
-
-    const monthName = nepaliMonths[bsMonth] || nepaliMonths[0];
-    const dayName = (adDate && typeof adDate.getDay === 'function') ? weekdays[adDate.getDay()] : weekdays[0];
-
-    return _latinToDevnagari(`${bsYear} ${monthName} ${Number(bsDay)}, ${dayName}`);
+    if (window.NepaliCalendar && typeof NepaliCalendar.formatDisplay === 'function') return NepaliCalendar.formatDisplay(inputDate);
+    return getCurrentNepaliDate();
   } catch (e) {
-    try { return _latinToDevnagari(getCurrentNepaliDate()); } catch (e2) { return getCurrentNepaliDate(); }
+    console.error('formatNepaliDisplay failed', e);
+    return getCurrentNepaliDate();
   }
 }
 
@@ -1748,49 +1619,10 @@ function _nepaliMonthNameToNumber(name) {
 
 // Normalize various Nepali date display forms into YYYY-MM-DD (ASCII digits)
 function normalizeNepaliDisplayToISO(raw) {
-  if (!raw) return '';
-  let s = String(raw).trim();
-  // convert devanagari digits first
-  s = _devnagariToLatin(s);
-
-  // If already looks like YYYY-MM-DD after conversion, return padded
-  const dashMatch = s.match(/(\d{4})\D(\d{1,2})\D(\d{1,2})/);
-  if (dashMatch) {
-    const y = dashMatch[1];
-    const mo = String(dashMatch[2]).padStart(2, '0');
-    const d = String(dashMatch[3]).padStart(2, '0');
-    return `${y}-${mo}-${d}`;
-  }
-
-  // Try patterns like: "2082 फागुन 9, शुक्रवार" or "2082 फागुन ९"
-  const tokens = s.split(/\s+/).filter(Boolean);
-  if (tokens.length >= 2) {
-    // year is usually first token
-    const yearToken = tokens[0].replace(/[^0-9]/g, '');
-    let monthToken = tokens[1].replace(/[^\u0900-\u097Fa-zA-Z]/g, '');
-    let dayToken = '';
-    // find first token that contains digits for day
-    for (let i=2;i<tokens.length;i++) {
-      const t = tokens[i].replace(/[,\s]/g, '');
-      if (t.match(/\d/)) { dayToken = t.replace(/[^0-9]/g,''); break; }
-    }
-    // sometimes day is the second token (e.g., "फागुन ९") if year omitted - but we expect year
-    if (!dayToken && tokens[2] && tokens[2].match(/\d/)) dayToken = tokens[2].replace(/[^0-9]/g,'');
-
-    const monthNumber = _nepaliMonthNameToNumber(monthToken) || (tokens[1].match(/\d+/) ? Number(tokens[1]) : null);
-    if (yearToken && monthNumber && dayToken) {
-      return `${yearToken}-${String(monthNumber).padStart(2,'0')}-${String(dayToken).padStart(2,'0')}`;
-    }
-  }
-
-  // Fallback: strip nondigits and try to parse YYYYMMDD
-  const digits = s.replace(/[^0-9]/g,'');
-  if (digits.length === 8) {
-    return `${digits.slice(0,4)}-${digits.slice(4,6)}-${digits.slice(6,8)}`;
-  }
-
-  // Last resort: return original trimmed (but ASCII digits)
-  return s;
+  try {
+    if (window.NepaliCalendar && typeof NepaliCalendar.normalizeNepaliDisplayToISO === 'function') return NepaliCalendar.normalizeNepaliDisplayToISO(raw);
+  } catch (e) { console.error('normalizeNepaliDisplayToISO delegator failed', e); }
+  return '';
 }
 
 // Parse complaint registration date into an AD Date object when possible.
@@ -1798,67 +1630,15 @@ function normalizeNepaliDisplayToISO(raw) {
 // - AD ISO (YYYY-MM-DD)
 // - BS ISO (YYYY-MM-DD) if NepaliFunctions.BS2AD is available
 function _parseComplaintRegDateToAD(complaint) {
+  // Prefer centralized implementation when available
+  try { if (window.NepaliCalendar && typeof NepaliCalendar.parseComplaintRegDateToAD === 'function') return NepaliCalendar.parseComplaintRegDateToAD(complaint); } catch (e) {}
+  // Fallback: minimal parsing
   if (!complaint) return null;
   const raw = complaint.entryDate || complaint.date || complaint['दर्ता मिति'] || complaint['Entry Date'] || complaint.createdAt || '';
   if (!raw) return null;
-
   const iso = normalizeNepaliDisplayToISO(raw);
   if (!iso) return null;
-
-  const m = String(iso).match(/^(\d{4})-(\d{2})-(\d{2})$/);
-  if (!m) {
-    const d = new Date(iso);
-    return isNaN(d.getTime()) ? null : d;
-  }
-
-  const y = Number(m[1]);
-  const mo = Number(m[2]);
-  const da = Number(m[3]);
-  if (!y || !mo || !da) return null;
-
-  // Heuristic: Nepali BS years are generally >= 2050
-  const looksBS = y >= 2050;
-  if (looksBS) {
-    try {
-      // Prefer NepaliDatePicker v5.x if available
-      if (typeof NepaliDatePicker !== 'undefined' && typeof NepaliDatePicker.bs2ad === 'function') {
-        const adStr = NepaliDatePicker.bs2ad(`${y}-${String(mo).padStart(2, '0')}-${String(da).padStart(2, '0')}`);
-        const ad = normalizeNepaliDisplayToISO(adStr);
-        const d = new Date(ad);
-        return isNaN(d.getTime()) ? null : d;
-      }
-
-      // jQuery plugin fallback
-      if (typeof $ !== 'undefined' && $.fn && $.fn.nepaliDatePicker && typeof $.fn.nepaliDatePicker.bs2ad === 'function') {
-        const adStr = $.fn.nepaliDatePicker.bs2ad(`${y}-${String(mo).padStart(2, '0')}-${String(da).padStart(2, '0')}`);
-        const ad = normalizeNepaliDisplayToISO(adStr);
-        const d = new Date(ad);
-        return isNaN(d.getTime()) ? null : d;
-      }
-
-      // NepaliFunctions fallback (some builds expose it)
-      if (typeof NepaliFunctions !== 'undefined' && typeof NepaliFunctions.BS2AD === 'function') {
-        const adStr = NepaliFunctions.BS2AD(y, mo, da); // expected YYYY-MM-DD
-        const ad = normalizeNepaliDisplayToISO(adStr);
-        const d = new Date(ad);
-        return isNaN(d.getTime()) ? null : d;
-      }
-
-      // Simple fallback: approximate BS->AD using reference point (not 100% accurate but enables highlighting)
-      // Reference: 2081-01-01 BS ≈ 2024-04-13 AD (approx)
-      const refBS = new Date(2081, 0, 1); // 2081-01-01
-      const refAD = new Date(2024, 3, 13); // 2024-04-13
-      const bsDate = new Date(y, mo - 1, da);
-      const diffDays = Math.floor((bsDate - refBS) / (1000 * 60 * 60 * 24));
-      const approxAD = new Date(refAD.getTime() + diffDays * 24 * 60 * 60 * 1000);
-      return isNaN(approxAD.getTime()) ? null : approxAD;
-    } catch (e) {
-      return null;
-    }
-  }
-
-  // AD
-  const d = new Date(`${m[1]}-${m[2]}-${m[3]}T00:00:00`);
+  const d = new Date(iso);
   return isNaN(d.getTime()) ? null : d;
 }
 
@@ -1890,7 +1670,11 @@ async function updateNepaliDate() {
     const day = String(today.getDate()).padStart(2, '0');
     const adDateStr = `${year}-${month}-${day}`;
 
-    const bsDateStr = convertADtoBS(adDateStr);
+    let bsDateStr = '';
+    try { if (window.NepaliCalendar && typeof NepaliCalendar.convertADtoBS === 'function') bsDateStr = NepaliCalendar.convertADtoBS(adDateStr); } catch(e){}
+    if (!bsDateStr) {
+      try { bsDateStr = convertADtoBS(adDateStr); } catch(e){}
+    }
     if (bsDateStr) {
       const [bsYear, bsMonth, bsDay] = bsDateStr.split('-');
       const nepaliMonths = ["बैशाख", "जेठ", "असार", "साउन", "भदौ", "असोज", "कार्तिक", "मंसिर", "पुष", "माघ", "फागुन", "चैत"];
@@ -1904,119 +1688,27 @@ async function updateNepaliDate() {
     console.warn('updateNepaliDate conversion failed, falling back:', e);
   }
 
-  // Fallback: पुरानो गणना
+  // Fallback: पुरानो गणना (delegate if available)
+  try { if (window.NepaliCalendar && typeof NepaliCalendar.getFallbackNepaliDate === 'function') { nepaliDateElement.textContent = _latinToDevnagari(NepaliCalendar.getFallbackNepaliDate()); return; } } catch(e){}
   nepaliDateElement.textContent = _latinToDevnagari(getFallbackNepaliDate());
 }
 
 // Fallback function (यदि API fail भयो भने)
 // Fallback function (यदि API fail भयो भने)
 function getFallbackNepaliDate() {
-    const now = new Date();
-    
-    // 2025-02-16 (AD) = 2081-11-03 (BS) - फागुन ३, २०८१
-    // यो लगभग सही छ, तर पूर्ण सटीक छैन
-    
-    // महिनाको दिन संख्या (बैशाख देखि चैत सम्म)
-    const monthDays = [30, 31, 32, 31, 32, 30, 30, 29, 30, 29, 30, 30];
-    const nepaliMonths = ["बैशाख", "जेठ", "असार", "साउन", "भदौ", "असोज", 
-                         "कार्तिक", "मंसिर", "पुष", "माघ", "फागुन", "चैत"];
-    const weekdays = ["आइतबार", "सोमबार", "मंगलबार", "बुधबार", 
-                     "बिहीबार", "शुक्रबार", "शनिबार"];
-    
-    // Reference date: 2025-02-16 = 2081-11-03
-    const refAD = new Date(2025, 1, 16); // month is 0-indexed: 1 = February
-    const refBS = { year: 2081, month: 11, day: 3 }; // month 11 = फागुन
-    
-    // दिनको अन्तर निकाल्ने
-    const diffTime = now - refAD;
-    const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
-    
-    let bsYear = refBS.year;
-    let bsMonth = refBS.month;
-    let bsDay = refBS.day + diffDays;
-    
-    // महिना अनुसार दिन समायोजन गर्ने
-    while (bsDay > monthDays[bsMonth - 1]) {
-        bsDay -= monthDays[bsMonth - 1];
-        bsMonth++;
-        if (bsMonth > 12) {
-            bsMonth = 1;
-            bsYear++;
-        }
-    }
-    
-    // यदि दिन १ भन्दा कम भयो भने (अघिल्लो महिनामा जानुपर्छ)
-    while (bsDay < 1) {
-        bsMonth--;
-        if (bsMonth < 1) {
-            bsMonth = 12;
-            bsYear--;
-        }
-        bsDay += monthDays[bsMonth - 1];
-    }
-    
-    const monthName = nepaliMonths[bsMonth - 1] || "बैशाख";
-    const dayName = weekdays[now.getDay()];
-    
-    return `${bsYear} ${monthName} ${bsDay}, ${dayName}`;
+  try { if (window.NepaliCalendar && typeof NepaliCalendar.getFallbackNepaliDate === 'function') return NepaliCalendar.getFallbackNepaliDate(); } catch (e) { console.error('getFallbackNepaliDate delegator failed', e); }
+  return '';
 }
 
 // Convert AD YYYY-MM-DD to BS YYYY-MM-DD using available libraries or accurate fallback
 function convertADtoBS(adDateStr) {
-  if (!adDateStr) return '';
-  try {
-    // If already looks like BS (year >= 2050), assume it's BS
-    const m = String(adDateStr).trim().match(/(\d{4})-(\d{1,2})-(\d{1,2})/);
-    if (m) {
-      const y = Number(m[1]);
-      if (y >= 2050) return `${m[1]}-${String(m[2]).padStart(2,'0')}-${String(m[3]).padStart(2,'0')}`;
-
-      // Accurate fallback algorithm (same as backend)
-      const parts = [Number(m[1]), Number(m[2]), Number(m[3])];
-      if (parts.every(n => !isNaN(n))) {
-        return convertADtoBSAccurate(`${m[1]}-${String(m[2]).padStart(2,'0')}-${String(m[3]).padStart(2,'0')}`);
-      }
-    }
-  } catch (e) {
-    console.warn('convertADtoBS failed:', e);
-  }
+  try { if (window.NepaliCalendar && typeof NepaliCalendar.convertADtoBS === 'function') return NepaliCalendar.convertADtoBS(adDateStr); } catch(e) { console.error('convertADtoBS delegator failed', e); }
   return '';
 }
 // Accurate AD to BS conversion - Final corrected version (matches backend)
 function convertADtoBSAccurate(adDateStr) {
-  try {
-    // Skip conversion if input is invalid
-    if (!adDateStr || adDateStr === 'undefined' || adDateStr === '') {
-      return '';
-    }
-    
-    // Final corrected algorithm (matches backend exactly)
-    const m = String(adDateStr).trim().match(/(\d{4})-(\d{1,2})-(\d{1,2})/);
-    if (m) {
-      const parts = [Number(m[1]), Number(m[2]), Number(m[3])];
-      if (parts.every(n => !isNaN(n))) {
-        // Match backend formula exactly
-        const adYear = parts[0];
-        const adMonth = parts[1];
-        const adDay = parts[2];
-        
-        // Backend formula: bsYear = adYear + 56, bsMonth = adMonth + 8, bsDay = adDay + 17
-        // Adjusted +17 to correct off-by-one for current Nepali date display
-        let bsYear = adYear + 56;
-        let bsMonth = adMonth + 8;
-        let bsDay = adDay + 17;
-        
-        if (bsDay > 30) { bsDay -= 30; bsMonth++; }
-        if (bsMonth > 12) { bsMonth -= 12; bsYear++; }
-        
-        return `${bsYear}-${String(bsMonth).padStart(2,'0')}-${String(bsDay).padStart(2,'0')}`;
-      }
-    }
-    
-    return getFallbackNepaliDate();
-  } catch (e) {
-    return getFallbackNepaliDate();
-  }
+  try { if (window.NepaliCalendar && typeof NepaliCalendar.convertADtoBSAccurate === 'function') return NepaliCalendar.convertADtoBSAccurate(adDateStr); } catch(e) { console.error('convertADtoBSAccurate delegator failed', e); }
+  return '';
 }
 
 function ensureBSDate(raw) {
@@ -2024,6 +1716,7 @@ function ensureBSDate(raw) {
   let s = String(raw).trim();
   // If contains Devanagari or Nepali month names, normalize
   if (/[\u0900-\u097F]/.test(s) || /[बैशाख|जेठ|फागुन|चैत]/.test(s)) {
+    try { if (window.NepaliCalendar && typeof NepaliCalendar.normalizeNepaliDisplayToISO === 'function') { const normalized = NepaliCalendar.normalizeNepaliDisplayToISO(s); if (normalized) return normalized; } } catch(e){}
     const normalized = normalizeNepaliDisplayToISO(s);
     if (normalized) return normalized;
   }
@@ -2033,7 +1726,9 @@ function ensureBSDate(raw) {
     const year = Number(isoMatch[1]);
     if (year >= 2050) return `${isoMatch[1]}-${String(isoMatch[2]).padStart(2,'0')}-${String(isoMatch[3]).padStart(2,'0')}`;
     // likely AD, convert
-    const converted = convertADtoBS(s);
+    let converted = '';
+    try { if (window.NepaliCalendar && typeof NepaliCalendar.convertADtoBS === 'function') converted = NepaliCalendar.convertADtoBS(s); } catch(e){}
+    if (!converted) converted = convertADtoBS(s);
     return converted || `${isoMatch[1]}-${String(isoMatch[2]).padStart(2,'0')}-${String(isoMatch[3]).padStart(2,'0')}`;
   }
   // Try to parse digits and convert
@@ -5710,7 +5405,29 @@ function exportShakhaDetails(shakha) {
   exportReportToExcel(data, `${shakha}_उजुरीहरू`);
 }
 
-// Duplicate openModal function removed - now using modalManager.openModal()
+function openModal(title, content) {
+  if (window.NVC && NVC.UI && typeof NVC.UI.openModalContent === 'function') return NVC.UI.openModalContent.apply(this, arguments);
+  try {
+    document.getElementById('modalTitle').textContent = title;
+    document.getElementById('modalBody').innerHTML = content;
+    document.getElementById('complaintModal').classList.remove('hidden');
+    // mark modal open timestamp to avoid immediate-close race with other handlers
+    try { window._nvc_modalJustOpened = Date.now(); } catch (e) {}
+    // Force modal to be visible
+    try {
+      const modal = document.getElementById('complaintModal');
+      if (modal) {
+        modal.style.setProperty('opacity', '1', 'important');
+        modal.style.setProperty('visibility', 'visible', 'important');
+        const modalContent = modal.querySelector('.modal-content');
+        if (modalContent) {
+          modalContent.style.setProperty('opacity', '1', 'important');
+        }
+      }
+    } catch(e) {}
+    if (typeof applyDevanagariDigits === 'function') applyDevanagariDigits(document.getElementById('complaintModal'));
+  } catch (e) { console.error('openModal fallback failed', e); }
+}
 
 function _closeModal() {
   try {
@@ -5732,8 +5449,41 @@ function _closeModal() {
 
 NVC.UI.closeModal = _closeModal;
 
-// Duplicate closeModal function removed - now using modalManager.closeModal()
+function closeModal() {
+  try { 
+    console.log('[global closeModal] called, args=', arguments); 
+    console.log('[global closeModal] stack trace:', (new Error()).stack);
+  } catch(e){}
+  try {
+    const id = arguments && arguments.length > 0 ? arguments[0] : null;
+    let el = null;
+    if (id) el = document.getElementById(id);
+    if (!el) el = document.querySelector('.modal:not(.hidden)') || document.getElementById('complaintModal');
+    if (!el) return;
+    // Avoid closing immediately after opening (race with openModalContent handlers)
+    try {
+      const justOpened = window._nvc_modalJustOpened || 0;
+      const timeDiff = Date.now() - justOpened;
+      console.log('[global closeModal] timeSinceOpen:', timeDiff);
+      if (justOpened && timeDiff < 500) {
+        console.log('[global closeModal] ignored due to recent open (<500ms)');
+        // clear flag after ignoring once so future closes work
+        try { delete window._nvc_modalJustOpened; } catch(e){}
+        return;
+      }
+    } catch (e) {}
+    console.log('[global closeModal] hiding element', el);
+    try { el.classList.add('hidden'); } catch(e) {}
+    try { 
+      // Remove any inline properties that may keep the modal visible
+      el.style.removeProperty('display'); el.style.removeProperty('visibility'); el.style.removeProperty('opacity'); el.style.removeProperty('z-index'); 
+      // Force-hide with inline important styles to override any previously set important rules
+      try { el.style.setProperty('display', 'none', 'important'); el.style.setProperty('visibility', 'hidden', 'important'); el.style.setProperty('opacity', '0', 'important'); } catch (e) {}
+    } catch(e) {}
+  } catch (e) { console.warn('[global closeModal] error', e); }
+}
 
+// Robust modal close helper: try framework close, then global close, and repeat after a short delay
 function closeModalRobust() {
   try {
     try { if (window.NVC && NVC.UI && typeof NVC.UI.closeModal === 'function') NVC.UI.closeModal(); else if (typeof closeModal === 'function') closeModal(); } catch(e) {}
@@ -18292,12 +18042,18 @@ function toggleFieldSpeech(fieldId, btnId) {
       return;
     }
     const key = fieldId;
-    if (!fieldSpeechState[key]) fieldSpeechState[key] = { recognition: null, listening: false };
+    if (!fieldSpeechState[key]) fieldSpeechState[key] = { recognition: null, listening: false, timeoutId: null };
     const state = fieldSpeechState[key];
     const btn = document.getElementById(btnId);
 
     if (state.listening) {
-      try { state.recognition.stop(); } catch (e) {}
+      try { 
+        if (state.timeoutId) {
+          clearTimeout(state.timeoutId);
+          state.timeoutId = null;
+        }
+        state.recognition.stop(); 
+      } catch (e) {}
       state.listening = false;
       if (btn) { btn.classList.remove('listening'); btn.innerHTML = '<i class="fas fa-microphone"></i> आवाज टाइप'; }
       return;
@@ -18305,13 +18061,26 @@ function toggleFieldSpeech(fieldId, btnId) {
 
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     const recog = new SpeechRecognition();
-    recog.continuous = false;
+    recog.continuous = true; // Keep listening continuously
     recog.interimResults = true;
     recog.lang = 'ne-NP';
+
+    // Function to reset the 3-second timeout
+    const resetTimeout = () => {
+      if (state.timeoutId) {
+        clearTimeout(state.timeoutId);
+      }
+      state.timeoutId = setTimeout(() => {
+        console.log('3 seconds of silence detected, stopping speech recognition');
+        try { recog.stop(); } catch (e) {}
+      }, 3000); // 3 seconds timeout
+    };
 
     recog.onstart = () => {
       state.listening = true;
       if (btn) { btn.classList.add('listening'); btn.innerHTML = '<i class="fas fa-stop"></i> रोक्नुहोस्'; }
+      // Start the initial timeout
+      resetTimeout();
     };
 
     let interim = '';
@@ -18319,14 +18088,27 @@ function toggleFieldSpeech(fieldId, btnId) {
       try {
         let finalTranscript = '';
         interim = '';
+        let hasSpeech = false;
+        
         for (let i = 0; i < ev.results.length; i++) {
           const res = ev.results[i];
-          if (res.isFinal) finalTranscript += res[0].transcript;
-          else interim += res[0].transcript;
+          if (res.isFinal) {
+            finalTranscript += res[0].transcript;
+            hasSpeech = true;
+          } else {
+            interim += res[0].transcript;
+            hasSpeech = true;
+          }
         }
+        
+        // Reset timeout whenever speech is detected (final or interim)
+        if (hasSpeech) {
+          resetTimeout();
+        }
+        
         const field = document.getElementById(fieldId);
         if (field) {
-          // Append interim/final without losing existing content; only commit final segments
+          // Append final results without losing existing content
           if (finalTranscript && finalTranscript.trim().length > 0) {
             field.value = (field.value ? field.value + ' ' : '') + finalTranscript.trim();
           }
@@ -18337,12 +18119,21 @@ function toggleFieldSpeech(fieldId, btnId) {
     recog.onerror = (ev) => {
       console.error('Field speech error', ev);
       showToast('आवाज पहिचानमा समस्या भयो', 'error');
+      if (state.timeoutId) {
+        clearTimeout(state.timeoutId);
+        state.timeoutId = null;
+      }
       try { recog.stop(); } catch (e) {}
       state.listening = false;
       if (btn) { btn.classList.remove('listening'); btn.innerHTML = '<i class="fas fa-microphone"></i> आवाज टाइप'; }
     };
 
     recog.onend = () => {
+      // Clear timeout when recognition ends
+      if (state.timeoutId) {
+        clearTimeout(state.timeoutId);
+        state.timeoutId = null;
+      }
       state.listening = false;
       if (btn) { btn.classList.remove('listening'); btn.innerHTML = '<i class="fas fa-microphone"></i> आवाज टाइप'; }
     };

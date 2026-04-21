@@ -12,6 +12,33 @@
     }
   };
 
+  // Loading spinner helpers: centralize DOM updates for consistent look
+  NVC.UI.showLoadingSpinner = function(statusText){
+    try {
+      const spinner = document.getElementById('loadingSpinner');
+      const statusEl = document.getElementById('loadingStatusText');
+      if (statusEl) statusEl.textContent = statusText || statusEl.textContent || 'कृपया प्रतिक्षा गर्नुहोस्...';
+      if (spinner) {
+        spinner.style.display = 'flex';
+        document.body.style.overflow = 'hidden';
+      }
+    } catch (e) { console.warn('NVC.UI.showLoadingSpinner failed', e); }
+  };
+
+  NVC.UI.hideLoadingSpinner = function(){
+    try {
+      const spinner = document.getElementById('loadingSpinner');
+      if (spinner) {
+        spinner.style.display = 'none';
+        document.body.style.overflow = '';
+      }
+    } catch (e) { console.warn('NVC.UI.hideLoadingSpinner failed', e); }
+  };
+
+  NVC.UI.updateLoadingStatus = function(statusText){
+    try { const statusEl = document.getElementById('loadingStatusText'); if (statusEl) statusEl.textContent = statusText || ''; } catch(e){ console.warn('NVC.UI.updateLoadingStatus failed', e); }
+  };
+
   NVC.UI.openModal = function(id){
     const el = document.getElementById(id);
     if (!el) return;
@@ -486,6 +513,93 @@
         NVC.UI.showToast('प्राविधिक परीक्षकहरू लोड गर्न सकिएन', 'error');
       }
     }
+  };
+
+  // Employee row helpers (migrate DOM helpers here so UI-related code is centralized)
+  NVC.UI.addEmployeeRow = function(type) {
+    try {
+      const container = document.getElementById(`${type}EmployeesContainer`);
+      if (!container) return;
+      const rowId = `${type}_${Date.now()}`;
+      const row = document.createElement('div');
+      row.className = 'd-grid gap-2 mb-2';
+      row.id = rowId;
+      row.style.cssText = 'grid-template-columns: 2fr 1fr 1fr auto; padding: 8px; border: 1px solid #dee2e6; border-radius: 4px; background: #f8f9fa;';
+      row.innerHTML = `
+        <input type="text" id="employee_name_${rowId}" name="employee_name" class="form-control" placeholder="कर्मचारीको नाम" data-field="name" />
+        <input type="text" id="employee_post_${rowId}" name="employee_post" class="form-control" placeholder="पद" data-field="post" />
+        <input type="text" id="employee_symbol_${rowId}" name="employee_symbol" class="form-control" placeholder="संकेत नं" data-field="symbol" />
+        <button type="button" class="btn btn-sm btn-danger" onclick="document.getElementById('${rowId}').remove();">
+          <i class="fas fa-trash"></i>
+        </button>
+      `;
+      container.appendChild(row);
+    } catch (e) { console.warn('NVC.UI.addEmployeeRow failed', e); }
+  };
+
+  NVC.UI.removeEmployeeRow = function(rowId){
+    try { const row = document.getElementById(rowId); if (row) row.remove(); } catch(e){ console.warn('NVC.UI.removeEmployeeRow failed', e); }
+  };
+
+  NVC.UI.getEmployeeData = function(type){
+    try {
+      const container = document.getElementById(`${type}EmployeesContainer`);
+      if (!container) return [];
+      const employees = [];
+      const rows = container.querySelectorAll('[id^="' + type + '_"]');
+      rows.forEach(row => {
+        const nameInput = row.querySelector('input[data-field="name"]');
+        const postInput = row.querySelector('input[data-field="post"]');
+        const symbolInput = row.querySelector('input[data-field="symbol"]');
+        if (nameInput && nameInput.value.trim()) {
+          employees.push({ name: nameInput.value.trim(), post: postInput ? postInput.value.trim() : '', symbol: symbolInput ? symbolInput.value.trim() : '' });
+        }
+      });
+      return employees;
+    } catch(e){ console.warn('NVC.UI.getEmployeeData failed', e); return []; }
+  };
+
+  NVC.UI.addEmployeeRowTo = function(containerId, data = {}){
+    try {
+      const container = document.getElementById(containerId);
+      if (!container) return;
+      const rowId = `${containerId}_${Date.now()}_${Math.floor(Math.random()*1000)}`;
+      const row = document.createElement('div');
+      row.className = 'd-grid gap-2 mb-2';
+      row.id = rowId;
+      row.style.cssText = 'grid-template-columns: 2fr 1fr 1fr auto; padding: 8px; border: 1px solid #dee2e6; border-radius: 4px; background: #f8f9fa;';
+      const nameVal = data.name ? String(data.name) : '';
+      const postVal = data.post ? String(data.post) : '';
+      const symbolVal = data.symbol ? String(data.symbol) : '';
+      const esc = (window.NVC && NVC.Utils && typeof NVC.Utils.escapeHtml === 'function') ? NVC.Utils.escapeHtml : function(s){ return String(s||''); };
+      row.innerHTML = `
+        <input type="text" id="employee_name_${rowId}" name="employee_name" class="form-control" placeholder="कर्मचारीको नाम" data-field="name" value="${esc(nameVal)}" />
+        <input type="text" id="employee_post_${rowId}" name="employee_post" class="form-control" placeholder="पद" data-field="post" value="${esc(postVal)}" />
+        <input type="text" id="employee_symbol_${rowId}" name="employee_symbol" class="form-control" placeholder="संकेत नं" data-field="symbol" value="${esc(symbolVal)}" />
+        <button type="button" class="btn btn-sm btn-danger" onclick="document.getElementById('${rowId}').remove();">
+          <i class="fas fa-trash"></i>
+        </button>
+      `;
+      container.appendChild(row);
+    } catch(e){ console.warn('NVC.UI.addEmployeeRowTo failed', e); }
+  };
+
+  NVC.UI.getEmployeeDataFrom = function(containerId){
+    try {
+      const container = document.getElementById(containerId);
+      if (!container) return [];
+      const employees = [];
+      const rows = Array.from(container.children || []);
+      rows.forEach(row => {
+        const nameInput = row.querySelector('input[data-field="name"]');
+        const postInput = row.querySelector('input[data-field="post"]');
+        const symbolInput = row.querySelector('input[data-field="symbol"]');
+        if (nameInput && nameInput.value.trim()) {
+          employees.push({ name: nameInput.value.trim(), post: postInput ? postInput.value.trim() : '', symbol: symbolInput ? symbolInput.value.trim() : '' });
+        }
+      });
+      return employees;
+    } catch(e){ console.warn('NVC.UI.getEmployeeDataFrom failed', e); return []; }
   };
 
 })();
