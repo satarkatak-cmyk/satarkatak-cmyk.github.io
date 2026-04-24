@@ -47,10 +47,29 @@
     return m[key] || null;
   };
 
+  // Helper to clean up date display (remove time and fix timezone issues)
+  NVC.Utils.cleanDateDisplay = function(dateStr) {
+    if (!dateStr) return '';
+    const date = String(dateStr).trim();
+    if (!date) return '';
+    if (date.includes('T') && date.includes('Z')) {
+      try {
+        const dateObj = new Date(date);
+        const nepalTimeMs = dateObj.getTime() + 20700000; 
+        const nepalDate = new Date(nepalTimeMs);
+        return nepalDate.getUTCFullYear() + '-' + 
+               String(nepalDate.getUTCMonth() + 1).padStart(2, '0') + '-' + 
+               String(nepalDate.getUTCDate()).padStart(2, '0');
+      } catch (e) { return date.split('T')[0]; }
+    }
+    return date.split('T')[0].split(' ')[0];
+  };
+
   // Convert Devanagari digits to Latin digits
   NVC.Utils.devanagariToLatin = function(s){
     if (!s && s !== 0) return '';
-    return String(s).replace(/[०-९]/g, function(d){
+    const str = String(s);
+    return str.replace(/[०-९]/g, function(d){
       const map = { '०':'0','१':'1','२':'2','३':'3','४':'4','५':'5','६':'6','७':'7','८':'8','९':'9' };
       return map[d] || d;
     });
@@ -59,7 +78,8 @@
   // Convert Latin digits to Devanagari (basic)
   NVC.Utils.latinToDevanagari = function(s){
     if (s === null || s === undefined) return '';
-    return String(s).replace(/[0-9]/g, function(d){
+    const str = String(s);
+    return str.replace(/[0-9]/g, function(d){
       const map = { '0':'०','1':'१','2':'२','3':'३','4':'४','5':'५','6':'६','7':'७','8':'८','9':'९' };
       return map[d] || d;
     });
@@ -96,6 +116,7 @@
     if (typeof window !== 'undefined') {
       if (typeof window._devnagariToLatin === 'undefined') window._devnagariToLatin = NVC.Utils.devanagariToLatin;
       if (typeof window._latinToDevnagari === 'undefined') window._latinToDevnagari = NVC.Utils.latinToDevanagari;
+      if (typeof window.cleanDateDisplay === 'undefined') window.cleanDateDisplay = NVC.Utils.cleanDateDisplay;
 
       // Provide safe global wrappers for inline onclick handlers that may reference legacy globals.
       const legacyFns = [

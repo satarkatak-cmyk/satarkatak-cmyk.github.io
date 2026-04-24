@@ -22,6 +22,7 @@ function showLoadingSpinner(statusText = 'सेभ हुँदैछ...') {
         // Prevent body scroll when spinner is shown
         document.body.style.overflow = 'hidden';
     }
+    if (NVC.UI.showLoading) NVC.UI.showLoading(true, statusText);
 }
 
 function filterHotlineComplaints() {
@@ -61,7 +62,7 @@ function showHotlineComplaintsView(initialFilters = {}) {
                   <td data-label="क्र.सं.">${index + 1}</td><td data-label="मिति">${cleanDateDisplay(complaint.date || complaint.createdAt || '')}</td><td data-label="उजुरकर्ता">${complaint.complainant || '-'}</td><td data-label="विपक्षी">${complaint.accused || '-'}</td>
                   <td data-label="उजुरीको विवरण" class="text-limit" title="${complaint.description || ''}">${(complaint.description || '').substring(0, 50)}...</td>
                   <td data-label="सम्बन्धित शाखा">${displayShakhaName(complaint.assignedShakha || complaint.shakha || complaint.assignedShakhaName) || '-'}</td>
-                  <td data-label="शाखामा पठाएको मिति">${resolveComplaintAssignedDateSimple(complaint) || '-'}</td>
+                  <td data-label="शाखामा पठाएको मिति">${cleanDateDisplay(resolveComplaintAssignedDateSimple(complaint)) || '-'}</td>
                   <td data-label="स्थिति"><span class="status-badge ${complaint.status === 'resolved' ? 'status-resolved' : complaint.status === 'pending' ? 'status-pending' : 'status-progress'}">${complaint.status === 'resolved' ? 'फछ्रयौट' : complaint.status === 'pending' ? 'काम बाँकी' : 'चालु'}</span></td>
                   <td data-label="कार्य"><div class="table-actions"><button class="action-btn" data-action="view" data-id="${complaint.id}" title="हेर्नुहोस्"><i class="fas fa-eye"></i></button><button class="action-btn" data-action="assign" data-id="${complaint.id}" title="शाखामा पठाउनुहोस्"><i class="fas fa-paper-plane"></i></button></div></td>
                 </tr>
@@ -86,6 +87,7 @@ function hideLoadingSpinner() {
         // Restore body scroll
         document.body.style.overflow = '';
     }
+    if (NVC.UI.showLoading) NVC.UI.showLoading(false);
 }
 
 // Helper to clean up date display (remove time and fix timezone issues)
@@ -9602,13 +9604,24 @@ function showAdminDashboard() {
   const inProgressComplaints = state.complaints.filter(c => c.status === 'progress').length;
   const pendingComplaints = state.complaints.filter(c => c.status === 'pending').length;
   const resolvedComplaints = state.complaints.filter(c => c.status === 'resolved').length;
-  const monthlyComplaints = state.complaints.filter(c => {
+  const monthlyComplaints = (() => {
     const todayNepali = getCurrentNepaliDate(); // e.g., "2081-11-03"
-    if (!todayNepali) return false;
+    if (!todayNepali) return 0;
     const yearMonth = todayNepali.substring(0, 7); // "2081-11"
-    const complaintRegDate = c['उजुरी दर्ता मिति'] || c.regDate || '';
-    return complaintRegDate.startsWith(yearMonth);
-  }).length;
+    const startDate = `${yearMonth}-01`;
+    const endDate = todayNepali;
+    
+    const startAD = (typeof _parseComplaintRegDateToAD === 'function' && startDate) ? _parseComplaintRegDateToAD({ date: startDate }) : null;
+    const endAD = (typeof _parseComplaintRegDateToAD === 'function' && endDate) ? _parseComplaintRegDateToAD({ date: endDate }) : null;
+    
+    return state.complaints.filter(c => {
+        const cAD = (typeof _parseComplaintRegDateToAD === 'function') ? _parseComplaintRegDateToAD(c) : null;
+        if (!cAD) return false;
+        if (startAD && cAD < startAD) return false;
+        if (endAD && cAD > endAD) return false;
+        return true;
+    }).length;
+  })();
   
   const shakhaStats = {};
   state.complaints.forEach(complaint => {
@@ -9963,13 +9976,24 @@ function showMahashakhaDashboard() {
   const inProgressComplaints = mahashakhaComplaints.filter(c => c.status === 'progress').length;
   const pendingComplaints = mahashakhaComplaints.filter(c => c.status === 'pending').length;
   const resolvedComplaints = mahashakhaComplaints.filter(c => c.status === 'resolved').length;
-  const monthlyComplaints = mahashakhaComplaints.filter(c => {
+  const monthlyComplaints = (() => {
     const todayNepali = getCurrentNepaliDate(); // e.g., "2081-11-03"
-    if (!todayNepali) return false;
+    if (!todayNepali) return 0;
     const yearMonth = todayNepali.substring(0, 7); // "2081-11"
-    const complaintRegDate = c['उजुरी दर्ता मिति'] || c.regDate || '';
-    return complaintRegDate.startsWith(yearMonth);
-  }).length;
+    const startDate = `${yearMonth}-01`;
+    const endDate = todayNepali;
+    
+    const startAD = (typeof _parseComplaintRegDateToAD === 'function' && startDate) ? _parseComplaintRegDateToAD({ date: startDate }) : null;
+    const endAD = (typeof _parseComplaintRegDateToAD === 'function' && endDate) ? _parseComplaintRegDateToAD({ date: endDate }) : null;
+    
+    return mahashakhaComplaints.filter(c => {
+        const cAD = (typeof _parseComplaintRegDateToAD === 'function') ? _parseComplaintRegDateToAD(c) : null;
+        if (!cAD) return false;
+        if (startAD && cAD < startAD) return false;
+        if (endAD && cAD > endAD) return false;
+        return true;
+    }).length;
+  })();
   
   // Group by Shakha
   const shakhaStats = {};
@@ -10286,7 +10310,7 @@ function showTechnicalDashboard() {
       <div class="stat-widget pointer" onclick="showTechnicalProjectsView({status: 'active'})"><div class="stat-icon bg-secondary"><i class="fas fa-tasks"></i></div><div class="stat-info"><div class="stat-value">${activeProjects}</div><div class="stat-label">चालु आयोजना</div><span class="stat-trend trend-up"></span></div></div>
       <div class="stat-widget pointer" onclick="showTechnicalProjectsView({status: 'completed'})"><div class="stat-icon bg-info"><i class="fas fa-check-circle"></i></div><div class="stat-info"><div class="stat-value">${technicalProjects.filter(p => p.status === 'completed').length}</div><div class="stat-label">सम्पन्न आयोजना</div><span class="stat-trend trend-up"></span></div></div>
       <div class="stat-widget pointer" onclick="showTechnicalExaminersView()"><div class="stat-icon bg-warning"><i class="fas fa-user-tie"></i></div><div class="stat-info"><div class="stat-value">${(state.technicalExaminers || []).length}</div><div class="stat-label">प्राविधिक परीक्षक सूची</div><span class="stat-trend trend-up"></span></div></div>
-      <div class="stat-widget" onclick="showTechnicalProjectsView({monthly: true})"><div class="stat-icon bg-warning"><i class="fas fa-calendar-alt"></i></div><div class="stat-info"><div class="stat-value">${getCurrentNepaliMonth()}</div><div class="stat-label">यस महिनाका</div><span class="stat-trend trend-up"></span></div></div>
+      <div class="stat-widget pointer" onclick="showThisMonthsComplaints()"><div class="stat-icon bg-secondary"><i class="fas fa-calendar-alt"></i></div><div class="stat-info"><div class="stat-value">${monthlyComplaints}</div><div class="stat-label">यस महिनाका</div><span class="stat-trend trend-up"></span></div></div>
       <div class="stat-widget pointer" onclick="showComplaintsView({endDate: '2082-03-31'})"><div class="stat-icon" style="background-color: #6f42c1; color: white;"><i class="fas fa-history"></i></div><div class="stat-info"><div class="stat-value">${lastFyComplaints}</div><div class="stat-label">गत आ.व.को जिम्मेवारी</div><span class="stat-trend trend-down"></span></div></div>
       <div class="stat-widget pointer" onclick="showComplaintsView({startDate: '2082-04-01'})"><div class="stat-icon" style="background-color: #fd7e14; color: white;"><i class="fas fa-calendar-check"></i></div><div class="stat-info"><div class="stat-value">${thisFyComplaints}</div><div class="stat-label">यस आ.व.का उजुरी</div><span class="stat-trend trend-up"></span></div></div>
     </div>
@@ -10368,13 +10392,24 @@ function showShakhaDashboard() {
   const pendingComplaints = shakhaComplaints.filter(c => c.status === 'pending').length;
   const inProgressComplaints = shakhaComplaints.filter(c => c.status === 'progress').length;
   const resolvedComplaints = shakhaComplaints.filter(c => c.status === 'resolved').length;
-  const monthlyComplaints = shakhaComplaints.filter(c => {
+  const monthlyComplaints = (() => {
     const todayNepali = getCurrentNepaliDate(); // e.g., "2081-11-03"
-    if (!todayNepali) return false;
+    if (!todayNepali) return 0;
     const yearMonth = todayNepali.substring(0, 7); // "2081-11"
-    const complaintRegDate = c['उजुरी दर्ता मिति'] || c.regDate || '';
-    return complaintRegDate.startsWith(yearMonth);
-  }).length;
+    const startDate = `${yearMonth}-01`;
+    const endDate = todayNepali;
+    
+    const startAD = (typeof _parseComplaintRegDateToAD === 'function' && startDate) ? _parseComplaintRegDateToAD({ date: startDate }) : null;
+    const endAD = (typeof _parseComplaintRegDateToAD === 'function' && endDate) ? _parseComplaintRegDateToAD({ date: endDate }) : null;
+    
+    return shakhaComplaints.filter(c => {
+        const cAD = (typeof _parseComplaintRegDateToAD === 'function') ? _parseComplaintRegDateToAD(c) : null;
+        if (!cAD) return false;
+        if (startAD && cAD < startAD) return false;
+        if (endAD && cAD > endAD) return false;
+        return true;
+    }).length;
+  })();
   
   // Filter technical projects for this shakha
   let technicalProjects = state.projects || [];
@@ -11963,7 +11998,7 @@ function showAdminComplaintsView(initialFilters = {}) {
                   <td data-label="क्र.सं.">${index + 1}</td><td data-label="मिति">${cleanDateDisplay(complaint.date)}</td><td data-label="उजुरकर्ता">${complaint.complainant}</td><td data-label="विपक्षी">${complaint.accused || '-'}</td>
                   <td data-label="उजुरीको विवरण" class="text-limit" title="${complaint.description || ''}">${(complaint.description || '').substring(0, 50)}...</td>
                   <td data-label="सम्बन्धित शाखा">${displayShakhaName(complaint.assignedShakha || complaint.shakha || complaint.assignedShakhaName || (complaint.assignedShakhaCode && SHAKHA[complaint.assignedShakhaCode]) || '') || '-'}</td>
-                  <td data-label="शाखामा पठाएको मिति">${resolveComplaintAssignedDate(complaint) || '-'}</td>
+                  <td data-label="शाखामा पठाएको मिति">${cleanDateDisplay(resolveComplaintAssignedDate(complaint)) || '-'}</td>
                   <td data-label="निर्णय" class="text-limit" title="${complaint.decision || ''}">${complaint.decision ? complaint.decision.substring(0, 30) + '...' : '-'}</td>
                   <td data-label="कैफियत">${complaint.remarks || '-'}</td>
                   <td data-label="कार्य"><div class="table-actions"><button class="action-btn" data-action="view" data-id="${complaint.id}" title="हेर्नुहोस्"><i class="fas fa-eye"></i></button><button class="action-btn" data-action="assign" data-id="${complaint.id}" title="शाखामा पठाउनुहोस्"><i class="fas fa-paper-plane"></i></button><button class="action-btn" data-action="edit" data-id="${complaint.id}" title="सम्पादन गर्नुहोस्"><i class="fas fa-edit"></i></button></div></td>
