@@ -10694,6 +10694,7 @@ function showComplaintsView(initialFilters = {}) {
   const ministryFilter = initialFilters.ministry || '';
   const startDate = initialFilters.startDate || '';
   const endDate = initialFilters.endDate || '';
+  const sortField = initialFilters.sortField || 'date';
   const sortOrder = initialFilters.sortOrder || 'newest';
 
   if (statusFilter) {
@@ -10762,11 +10763,19 @@ function showComplaintsView(initialFilters = {}) {
 
   console.log(`📊 Total complaints: ${complaintsToShow.length}`);
   
-  // Sort complaints by registration date. Default newest first, support oldest as well.
+  // Sort complaints by selected field (registration date or creation date). Default newest first, support oldest as well.
   complaintsToShow.sort((a, b) => {
-    const getSortableDate = (c) => {
-      // Prioritize c.date (BS) as it is displayed in the table
-      let val = c.date || c['दर्ता मिति'] || c.entryDate || '';
+    const getSortableDate = (c, fieldType) => {
+      let val = '';
+      
+      if (fieldType === 'createdAt') {
+        // For creation date, prioritize सिर्जना मिति, then createdAt, then other creation date fields
+        val = c['सिर्जना मिति'] || c.createdAt || c['सिर्जना'] || c['सिर्जना_at'] || c.created_at || '';
+      } else {
+        // For registration date (default), prioritize c.date (BS) as it is displayed in the table
+        val = c.date || c['दर्ता मिति'] || c.entryDate || '';
+      }
+      
       if (!val) return '';
       
       // Normalize Devanagari to Latin digits
@@ -10777,11 +10786,18 @@ function showComplaintsView(initialFilters = {}) {
       if (match) {
         return `${match[1]}-${match[2].padStart(2, '0')}-${match[3].padStart(2, '0')}`;
       }
+      
+      // For ISO dates (from createdAt), extract date part
+      const isoMatch = val.match(/(\d{4}-\d{2}-\d{2})/);
+      if (isoMatch) {
+        return isoMatch[1];
+      }
+      
       return val;
     };
 
-    const dateA = getSortableDate(a);
-    const dateB = getSortableDate(b);
+    const dateA = getSortableDate(a, sortField);
+    const dateB = getSortableDate(b, sortField);
 
     if (!dateA && !dateB) return 0;
     if (!dateA) return 1;
@@ -10913,6 +10929,7 @@ function showComplaintsView(initialFilters = {}) {
     ministry: ministryFilter,
     searchField,
     search: searchFilter,
+    sortField,
     sortOrder,
     startDate,
     endDate
@@ -10991,6 +11008,10 @@ function showComplaintsView(initialFilters = {}) {
             <div class="filter-group-box">
                 <label class="filter-group-label">खोजी र क्रम</label>
                 <div class="d-flex flex-wrap gap-2 align-center">
+                    <select class="form-select form-select-sm" id="sortField" style="min-width: 110px;">
+                        <option value="date" ${sortField === 'date' ? 'selected' : ''}>दर्ता मिति</option>
+                        <option value="createdAt" ${sortField === 'createdAt' ? 'selected' : ''}>सिर्जना मिति</option>
+                    </select>
                     <select class="form-select form-select-sm" id="sortOrder" style="min-width: 110px;">
                         <option value="newest" ${sortOrder === 'newest' ? 'selected' : ''}>नयाँ -> पुरानो</option>
                         <option value="oldest" ${sortOrder === 'oldest' ? 'selected' : ''}>पुरानो -> नयाँ</option>
@@ -16345,6 +16366,7 @@ function filterComplaintsTable() {
   const ministry = document.getElementById('filterMinistry')?.value || '';
   const searchField = document.getElementById('searchField')?.value || 'all';
   const searchText = (document.getElementById('searchText')?.value || '').toLowerCase();
+  const sortField = document.getElementById('sortField')?.value || 'date';
   const sortOrder = document.getElementById('sortOrder')?.value || 'newest';
   const startDate = document.getElementById('filterStartDate')?.value || '';
   const endDate = document.getElementById('filterEndDate')?.value || '';
@@ -16363,6 +16385,7 @@ function filterComplaintsTable() {
       ministry,
       searchField,
       search: searchText,
+      sortField,
       sortOrder,
       startDate,
       endDate
@@ -16396,6 +16419,7 @@ function saveComplaintsFilters() {
       ministry: document.getElementById('filterMinistry')?.value || '',
         searchField: document.getElementById('searchField')?.value || 'all',
         search: document.getElementById('searchText')?.value || '',
+        sortField: document.getElementById('sortField')?.value || 'date',
         sortOrder: document.getElementById('sortOrder')?.value || 'newest',
         startDate: document.getElementById('filterStartDate')?.value || '',
         endDate: document.getElementById('filterEndDate')?.value || ''

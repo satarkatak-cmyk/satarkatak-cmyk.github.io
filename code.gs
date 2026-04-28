@@ -1079,8 +1079,14 @@ function saveToSheet(sheetName, data, idColumn = 'उजुरी दर्त�
     }
 
     // auto set update date/updated_by if those headers exist
-    if (headerMap.hasOwnProperty(normalizeKey('अपडेट मिति'))) merged[headerMap[normalizeKey('अपडेट मिति')]] = new Date().toISOString();
-    if (headerMap.hasOwnProperty(normalizeKey('अपडेट गर्ने')) && incoming['अपडेट गर्ने']) merged[headerMap[normalizeKey('अपडेट गर्ने')]] = incoming['अपडेट गर्ने'];
+    if (headerMap.hasOwnProperty(normalizeKey('अपडेट मिति')) || headerMap.hasOwnProperty(normalizeKey('updatedAt')) || headerMap.hasOwnProperty(normalizeKey('updated_at'))) {
+      const updateDateIndex = headerMap[normalizeKey('अपडेट मिति')] || headerMap[normalizeKey('updatedAt')] || headerMap[normalizeKey('updated_at')];
+      merged[updateDateIndex] = new Date().toISOString();
+    }
+    if ((headerMap.hasOwnProperty(normalizeKey('अपडेट गर्ने')) || headerMap.hasOwnProperty(normalizeKey('updatedBy')) || headerMap.hasOwnProperty(normalizeKey('updated_by'))) && incoming['अपडेट गर्ने']) {
+      const updateByIndex = headerMap[normalizeKey('अपडेट गर्ने')] || headerMap[normalizeKey('updatedBy')] || headerMap[normalizeKey('updated_by')];
+      merged[updateByIndex] = incoming['अपडेट गर्ने'] || incoming['updatedBy'] || incoming['updated_by'] || '';
+    }
 
     sheet.getRange(existingRow, 1, 1, merged.length).setValues([merged]);
     // Invalidate counts cache
@@ -1105,7 +1111,7 @@ function saveToSheet(sheetName, data, idColumn = 'उजुरी दर्त�
       }
     } else {
       // auto-set basic created/entry dates if appropriate
-      if (normalizeKey(h) === normalizeKey('सिर्जना मिति') || normalizeKey(h) === normalizeKey('सिर्जना') || normalizeKey(h) === normalizeKey('सिर्जना_at') || normalizeKey(h) === normalizeKey('created_at') ) {
+      if (normalizeKey(h) === normalizeKey('सिर्जना मिति') || normalizeKey(h) === normalizeKey('सिर्जना') || normalizeKey(h) === normalizeKey('सिर्जना_at') || normalizeKey(h) === normalizeKey('created_at') || normalizeKey(h) === normalizeKey('createdAt') ) {
         row.push(incoming[h] || new Date().toISOString());
       } else if (normalizeKey(h) === normalizeKey('सिर्जना गर्ने') || normalizeKey(h) === normalizeKey('created_by')) {
         row.push(incoming['createdBy'] || incoming['सिर्जना गर्ने'] || '');
