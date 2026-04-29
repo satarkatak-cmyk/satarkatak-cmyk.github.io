@@ -7,7 +7,7 @@
  */
 
 // ==================== CONFIGURATION ====================
-const SPREADSHEET_ID = '1VDsN3UOlDwjYPC3AOJvKpUu20d4I6cc_JLZYD8ogsGU';
+const SPREADSHEET_ID = '1hGHuMsQV1eDTI4ofEzs4dpQixzRvOA3uq0VHWCZ7Bqw';
 const CONFIG = {
   SHEETS: {
     COMPLAINTS: 'Complaints',
@@ -16,6 +16,7 @@ const CONFIG = {
     TECHNICAL_INSPECTORS: 'TechnicalInspectors',
     TECHNICAL_EXAMINERS: 'TechnicalExaminers',
     EMPLOYEE_MONITORING: 'कर्मचारी_अनुगमन',
+    EMPLOYEE_MONITORING_ITEMS: 'कर्मचारी_अनुगमन_विवरण',
     CITIZEN_CHARTER: 'CitizenCharter',
     INVESTIGATIONS: 'Investigations',
     NOTIFICATIONS: 'Notifications',
@@ -338,8 +339,11 @@ function getOnlineComplaintsHeaders() {
 }
 
 function getEmployeeMonitoringHeaders() {
-  return ['ID','मिति','कार्यालय_नाम','प्रदेश','जिल्ला','स्थानीय_तह','पोशाक_गणना','समय_गणना',
-    'पोशाक_कर्मचारीहरु','समय_कर्मचारीहरु','निर्देशन_मिति','कैफियत','बनाउने','समय_टिम्स्ट्याम्प'];
+  return ['ID','मिति','कार्यालय_नाम','प्रदेश','जिल्ला','स्थानीय_तह','पोशाक_गणना','समय_गणना','पोशाक_कर्मचारीहरु','समय_कर्मचारीहरु',
+    'निर्देशन_मिति','कैफियत','बनाउने','समय_टिम्स्ट्याम्प'];
+}
+function getEmployeeMonitoringItemHeaders() {
+  return ['ID', 'MonitoringID', 'Type', 'Name', 'Post', 'Symbol'];
 }
 
 function saveToExistingSheetObject(sheet, data, idColumn) {
@@ -1333,17 +1337,36 @@ function doGet(e) {
         response = deleteFromSheet(CONFIG.SHEETS.TECHNICAL_EXAMINERS, params.id, 'id');
         break;
 
-      case 'getEmployeeMonitoring':
-        response = { success: true, data: getSheetData(CONFIG.SHEETS.EMPLOYEE_MONITORING) };
+      case 'getEmployeeMonitoring': {
+        const mainData = getSheetData(CONFIG.SHEETS.EMPLOYEE_MONITORING);
+        const itemsData = getSheetData(CONFIG.SHEETS.EMPLOYEE_MONITORING_ITEMS);
+        const joined = mainData.map(parent => {
+          parent.uniformEmployees = itemsData.filter(i => String(i.monitoringid) === String(parent.id) && i.type === 'uniform');
+          parent.timeEmployees = itemsData.filter(i => String(i.monitoringid) === String(parent.id) && i.type === 'time');
+          return parent;
+        });
+        response = { success: true, data: joined };
         break;
+      }
+
       case 'saveEmployeeMonitoring':
-        response = saveToSheet(CONFIG.SHEETS.EMPLOYEE_MONITORING, params, 'ID');
+      case 'updateEmployeeMonitoring': {
+        const monitoringId = params.ID || params.id || Date.now().toString();
+        params.ID = monitoringId;
+        // Save Parent Data
+        const parentRes = saveToSheet(CONFIG.SHEETS.EMPLOYEE_MONITORING, params, 'ID');
+        
+        // Save Child Data (Items) if present
+        if (params.uniformEmployees || params.timeEmployees) {
+          const itemSheet = getSheet(CONFIG.SHEETS.EMPLOYEE_MONITORING_ITEMS, getEmployeeMonitoringItemHeaders());
+          // Simple approach: delete old items on update, then re-insert
+          deleteItemsByMonitoringId(itemSheet, monitoringId);
+          saveMonitoringItems(itemSheet, monitoringId, 'uniform', params.uniformEmployees);
+          saveMonitoringItems(itemSheet, monitoringId, 'time', params.timeEmployees);
+        }
+        response = parentRes;
         break;
-      case 'updateEmployeeMonitoring':
-        // Ensure ID is present for updating
-        if (!params.ID && params.id) params.ID = params.id;
-        response = saveToSheet(CONFIG.SHEETS.EMPLOYEE_MONITORING, params, 'ID');
-        break;
+      }
       case 'deleteEmployeeMonitoring':
         response = deleteFromSheet(CONFIG.SHEETS.EMPLOYEE_MONITORING, params.id, 'ID');
         break;
@@ -1620,7 +1643,8 @@ function setupSheets() {
     { name: CONFIG.SHEETS.PROJECTS, headers: ['project_id','project_name','organization','inspection_date','non_compliances','improvement_letter_date','improvement_info','status','remarks','shakha','created_by','created_at'] },
     { name: CONFIG.SHEETS.TECHNICAL_INSPECTORS, headers: ['inspector_id','name','qualification','experience','specialization','contact','email','shakha','status','created_by','created_at'] },
     { name: CONFIG.SHEETS.TECHNICAL_EXAMINERS, headers: ['id','प्राविधिक परीक्षकको नाम','NEC दर्ता नं.','प्राविधिक परीक्षक तालिम लिएको वर्ष','प्राविधिक परीक्षक प्रमाणपत्र नं.','प्राविधिक परीक्षण गरेका आयोजना','कैफियत','shakha','createdBy','createdAt'] },
-    { name: CONFIG.SHEETS.EMPLOYEE_MONITORING, headers: ['monitoring_id','monitoring_date','organization','uniform_violation','time_violation','instruction_date','remarks','created_by','created_at'] },
+    { name: CONFIG.SHEETS.EMPLOYEE_MONITORING, headers: getEmployeeMonitoringHeaders() },
+    { name: CONFIG.SHEETS.EMPLOYEE_MONITORING_ITEMS, headers: ['ID', 'MonitoringID', 'Type', 'Name', 'Post', 'Symbol'] },
     { name: CONFIG.SHEETS.CITIZEN_CHARTER, headers: ['charter_id','monitoring_date','organization','findings','instructions','instruction_date','remarks','created_by','created_at'] },
     { name: CONFIG.SHEETS.NOTIFICATIONS, headers: ['notification_id','title','message','time','target_shakha','type','sender','read','created_at'] },
     { name: CONFIG.SHEETS.NOTICES, headers: ['ID','Title','Description','Status','PublishDate','UploadedBy','CreatedAt'] },
@@ -1659,6 +1683,35 @@ function setupSheets() {
   }
 
   return 'Setup complete';
+}
+
+function deleteItemsByMonitoringId(sheet, monitoringId) {
+  const data = sheet.getDataRange().getValues();
+  for (let i = data.length - 1; i >= 1; i--) {
+    if (String(data[i][1]) === String(monitoringId)) {
+      sheet.deleteRow(i + 1);
+    }
+  }
+}
+
+function saveMonitoringItems(sheet, monitoringId, type, itemsJson) {
+  if (!itemsJson) return;
+  let items = [];
+  try {
+    items = typeof itemsJson === 'string' ? JSON.parse(itemsJson) : itemsJson;
+  } catch (e) { return; }
+  if (!Array.isArray(items)) return;
+
+  items.forEach(item => {
+    sheet.appendRow([
+      Date.now() + Math.floor(Math.random() * 1000),
+      monitoringId,
+      type,
+      item.name || '',
+      item.post || '',
+      item.symbol || ''
+    ]);
+  });
 }
 
 // ==================== NOTICE MANAGEMENT ====================

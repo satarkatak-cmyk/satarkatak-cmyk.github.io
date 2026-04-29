@@ -3589,8 +3589,8 @@ function formatEmployeeMonitoringFromSheet(sheetData) {
     province: String(getValue('प्रदेश', 'province') || ''),
     district: String(getValue('जिल्ला', 'district') || ''),
     localLevel: String(getValue('स्थानीय_तह', 'localLevel', 'स्थानीय तह') || ''),
-    uniformViolationCount: Number(getValue('पोशाक_गणना', 'uniformViolationCount', 'uniformViolation') || 0),
-    timeViolationCount: Number(getValue('समय_गणना', 'timeViolationCount', 'timeViolation') || 0),
+    uniformViolationCount: Number(getValue('पोशाक_गणना', 'uniformViolationCount', 'uniformViolationCount') || 0),
+    timeViolationCount: Number(getValue('समय_गणना', 'timeViolationCount', 'timeViolationCount') || 0),
     uniformEmployees: uniformEmployees,
     timeEmployees: timeEmployees,
     instructionDate: String(getValue('निर्देशन_मिति', 'instructionDate') || ''),
@@ -4950,7 +4950,35 @@ function exportToExcel(type) {
       filename = `प्राविधिक_परीक्षकहरू_${new Date().toISOString().slice(0,10)}.csv`;
       break;
     case 'employee_monitoring':
-      data = state.employeeMonitoring;
+      data = (state.employeeMonitoring || []).map(record => {
+        const getEmpList = (val) => {
+          if (!val) return [];
+          if (Array.isArray(val)) return val;
+          try { return JSON.parse(val); } catch(e) { return []; }
+        };
+        const formatEmpString = (employees) => {
+          if (!employees || employees.length === 0) return '-';
+          return employees.map(emp => {
+            if (!emp) return '';
+            let s = emp.name || '-';
+            if (emp.post) s += ` (${emp.post})`;
+            if (emp.symbol) s += ` [संकेत नं: ${emp.symbol}]`;
+            return s;
+          }).filter(Boolean).join(' | ');
+        };
+        const uniformList = getEmpList(record.uniformEmployees);
+        const timeList = getEmpList(record.timeEmployees);
+        return {
+          'आईडी': record.id || '-', 'मिति': record.date || '-', 'कार्यालय/निकाय': record.officeName || record.organization || '-',
+          'प्रदेश': record.province || '-', 'जिल्ला': record.district || '-', 'स्थानीय तह': record.localLevel || '-',
+          'पोशाक अपरिपालना संख्या': record.uniformViolationCount || uniformList.length || 0,
+          'पोशाक अपरिपालना गर्ने कर्मचारीहरू (नाम, पद, संकेत नं)': formatEmpString(uniformList),
+          'समय अपरिपालना संख्या': record.timeViolationCount || timeList.length || 0,
+          'समय अपरिपालना गर्ने कर्मचारीहरू (नाम, पद, संकेत नं)': formatEmpString(timeList),
+          'निर्देशन मिति': record.instructionDate || '-', 'कैफियत': record.remarks || '-',
+          'सिर्जना गर्ने': record.createdBy || '-', 'सिर्जना मिति': record.createdAt || '-'
+        };
+      });
       filename = `कार्यालय_अनुगमन_${new Date().toISOString().slice(0,10)}.csv`;
       break;
     case 'recent':
@@ -13350,7 +13378,7 @@ async function saveEmployeeMonitoring() {
     return;
   }
   
-  showLoadingIndicator(true, 'सेभ हुँदैछ....');
+  showLoadingSpinner('सेभ हुँदैछ');
 
   const newRecord = {
     id: Date.now(), 
@@ -13377,7 +13405,7 @@ async function saveEmployeeMonitoring() {
   if (result && result.success) {
     // Success - data saved to Google Sheets
     state.employeeMonitoring.unshift(newRecord);
-    showLoadingIndicator(false);
+    hideLoadingSpinner();
     showToast('कार्यालय अनुगमन Google Sheet मा सुरक्षित गरियो', 'success');
     closeModal();
     showEmployeeMonitoringView();
@@ -13385,7 +13413,7 @@ async function saveEmployeeMonitoring() {
     // Failed to save to Google Sheets - save locally
     console.log('Failed to save to Google Sheets, saving locally...');
     state.employeeMonitoring.unshift(newRecord);
-    showLoadingIndicator(false);
+    hideLoadingSpinner();
     showToast('कार्यालय अनुगमन Local मा सुरक्षित गरियो (Google Sheets error)', 'warning');
     closeModal();
     showEmployeeMonitoringView();
@@ -13437,6 +13465,31 @@ function viewEmployeeMonitoring(id) {
     return display;
   }).filter(Boolean).join(', ');
   
+  // Helper to generate a detailed table for employee lists
+  const generateEmployeeListTable = (employees, title) => {
+    if (!employees || employees.length === 0) return `<p class="text-muted">कुनै विवरण छैन।</p>`;
+    return `
+      <div class="mb-2"><strong>${title}</strong></div>
+      <div class="table-responsive mb-3">
+        <table class="table table-sm table-bordered">
+          <thead class="table-light">
+            <tr><th>क्र.सं.</th><th>कर्मचारीको नाम</th><th>पद</th><th>संकेत नं</th></tr>
+          </thead>
+          <tbody>
+            ${employees.map((emp, i) => `
+              <tr>
+                <td>${i + 1}</td>
+                <td>${escapeHtml(emp.name || '-')}</td>
+                <td>${escapeHtml(emp.post || '-')}</td>
+                <td>${escapeHtml(emp.symbol || '-')}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+    `;
+  };
+
   const content = `
     <div class="d-grid gap-3">
       <div class="d-grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
@@ -13448,10 +13501,9 @@ function viewEmployeeMonitoring(id) {
         <div><div class="text-small text-muted">जिल्ला</div><div>${record.district || ''}</div></div>
         <div><div class="text-small text-muted">स्थानीय तह</div><div>${record.localLevel || ''}</div></div>
       </div>
-      <div class="d-grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
-        <div><div class="text-small text-muted">पोशाक अपरिपालना</div><div>${record.uniformViolationCount || uniformEmployees.length || 0} जना<br><small>${uniformNames}</small></div></div>
-        <div><div class="text-small text-muted">समय अपरिपालना</div><div>${record.timeViolationCount || timeEmployees.length || 0} जना<br><small>${timeNames}</small></div></div>
-      </div>
+      <hr class="my-1">
+      ${generateEmployeeListTable(uniformEmployees, '👔 पोशाक अपरिपालना गर्ने कर्मचारीहरू')}
+      ${generateEmployeeListTable(timeEmployees, '⏰ समय अपरिपालना गर्ने कर्मचारीहरू')}
       <div><div class="text-small text-muted">निर्देशन मिति</div><div>${record.instructionDate}</div></div>
       <div><div class="text-small text-muted">कैफियत</div><div class="card p-3 bg-light">${record.remarks}</div></div>
     </div>
@@ -13500,7 +13552,7 @@ function editEmployeeMonitoring(id) {
         <div class="mt-2"><button type="button" class="btn btn-sm btn-outline-primary" onclick="addEmployeeRowTo('editTimeEmployeesContainer')">कर्मचारी थप्नुहोस्</button></div>
       </div>
     </div>
-    <div class="modal-footer"><button class="btn btn-outline" onclick="closeModal()">रद्द गर्नुहोस्</button><button class="btn btn-primary" onclick="saveEmployeeMonitoringEdit(${id})">सुरक्षित गर्नुहोस्</button></div>
+    <div class="modal-footer"><button class="btn btn-outline" onclick="closeModal()">रद्द गर्नुहोस्</button><button class="btn btn-primary" onclick="saveEmployeeMonitoringEdit('${id}')">सुरक्षित गर्नुहोस्</button></div>
   `;
   
   openModal('कार्यालय अनुगमन सम्पादन', formContent);
@@ -13537,8 +13589,11 @@ function saveEmployeeMonitoringEdit(id) {
   const currentUniformEmployees = getEmployeeDataFrom('editUniformEmployeesContainer');
   const currentTimeEmployees = getEmployeeDataFrom('editTimeEmployeesContainer');
   
+  // Prepare updated record by merging existing data with new form values
   const updatedRecord = {
     ...state.employeeMonitoring[recordIndex],
+    id: id,
+    monitoringId: id, // Ensure ID is preserved for backend update match
     date: _latinToDevnagari(document.getElementById('editEmpDate').value),
     officeName: document.getElementById('editEmpOrganization').value || '',
     organization: document.getElementById('editEmpOrganization').value || '',
@@ -13560,9 +13615,9 @@ function saveEmployeeMonitoringEdit(id) {
   state.employeeMonitoring[recordIndex] = updatedRecord;
   
   // Save to Google Sheets
-  showLoadingIndicator(true);
+  showLoadingSpinner('सेभ हुँदैछ');
   postToGoogleSheets('updateEmployeeMonitoring', updatedRecord).then(result => {
-    showLoadingIndicator(false);
+    hideLoadingSpinner();
     if (result && result.success) {
       showToast('कार्यालय अनुगमन Google Sheet मा सुरक्षित गरियो', 'success');
     } else {
@@ -13603,19 +13658,21 @@ function filterEmployeeMonitoring() {
         break;
       case 'employee':
         filteredData = filteredData.filter(record => {
-          let uniformEmployees = record.uniformEmployees || [];
-          let timeEmployees = record.timeEmployees || [];
-          try {
-            if (typeof uniformEmployees === 'string') uniformEmployees = JSON.parse(uniformEmployees);
-          } catch(e) { uniformEmployees = []; }
-          try {
-            if (typeof timeEmployees === 'string') timeEmployees = JSON.parse(timeEmployees);
-          } catch(e) { timeEmployees = []; }
-          const allEmployees = [...(Array.isArray(uniformEmployees) ? uniformEmployees : []), ...(Array.isArray(timeEmployees) ? timeEmployees : [])];
+          // सहयोगी फङ्सन: JSON स्ट्रिङ वा एरे दुवैलाई ह्यान्डल गर्न
+          const getEmpList = (val) => {
+            if (!val) return [];
+            if (Array.isArray(val)) return val;
+            try { return JSON.parse(val); } catch(e) { return []; }
+          };
+          
+          const allEmployees = [...getEmpList(record.uniformEmployees), ...getEmpList(record.timeEmployees)];
+          
           return allEmployees.some(emp => {
             const name = (emp && emp.name) ? String(emp.name).toLowerCase() : '';
             const post = (emp && emp.post) ? String(emp.post).toLowerCase() : '';
-            return name.includes(searchText) || post.includes(searchText);
+            const symbol = (emp && emp.symbol) ? String(emp.symbol).toLowerCase() : '';
+            // नाम, पद वा संकेत नं कुनै पनि मिलेमा फिल्टर हुन्छ (संकेत नं थपियो)
+            return name.includes(searchText) || post.includes(searchText) || symbol.includes(searchText);
           });
         });
         break;
