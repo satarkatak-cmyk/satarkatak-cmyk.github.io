@@ -1,6 +1,49 @@
 // Global theme variable
 let currentTheme = 'light';
 
+window.globalParseDateRobust = (dateStr) => {
+  if (!dateStr || typeof dateStr !== 'string') return null;
+  let normalized = String(dateStr).trim();
+  normalized = normalized.replace(/[०-९]/g, d => "0123456789"["०१२३४५६७८९".indexOf(d)]);
+
+  const isoMatch = normalized.match(/(\d{4})[\-/\.](\d{1,2})[\-/\.](\d{1,2})/);
+  if (isoMatch) {
+    const y = Number(isoMatch[1]);
+    const m = Number(isoMatch[2]);
+    const d = Number(isoMatch[3]);
+    if (y > 0 && m >= 1 && m <= 12 && d >= 1 && d <= 31) {
+      if (y >= 2050) {
+        if (typeof NepaliDatePicker !== 'undefined' && typeof NepaliDatePicker.bs2ad === 'function') {
+          try {
+            const adStr = NepaliDatePicker.bs2ad(`${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`);
+            const ad = new Date(adStr);
+            if (!isNaN(ad.getTime())) return ad;
+          } catch (e) { }
+        }
+        const refBS = new Date(2081, 0, 1);
+        const refAD = new Date(2024, 3, 13);
+        const bsDate = new Date(y, m - 1, d);
+        const diffDays = Math.floor((bsDate - refBS) / (1000 * 60 * 60 * 24));
+        const approxAD = new Date(refAD.getTime() + diffDays * 24 * 60 * 60 * 1000);
+        return isNaN(approxAD.getTime()) ? null : approxAD;
+      }
+      const adDate = new Date(y, m - 1, d);
+      return isNaN(adDate.getTime()) ? null : adDate;
+    }
+  }
+
+  const dateObj = new Date(normalized);
+  return isNaN(dateObj.getTime()) ? null : dateObj;
+};
+
+window.globalGetComplaintDateRaw = (complaint, field) => {
+  if (field === 'createdAt') {
+    return complaint.createdAt || complaint['सिर्जना मिति'] || complaint['created_at'] || complaint['सिर्जना'] || '';
+  }
+  return complaint.date || complaint['दर्ता मिति'] || complaint.entryDate || complaint['Entry Date'] || '';
+};
+
+
 // Safe element value accessor to avoid "reading 'value' of null" errors
 function elVal(id) {
   try {
@@ -1081,7 +1124,10 @@ const FINAL_DECISION_TYPES = {
   1: 'तामेली',
   2: 'सुझाव/निर्देशन',
   3: 'सतर्क',
-  4: 'अन्य'
+  4: 'छानविन तथा कारबाही गरी जानकारी दिन लेखी पठाउने',
+  5: 'अ. दु. अ.आ. मा लेखि पठाउने',
+  6: 'छानविन तथा कारबाहीका लागि अन्य निकायमा पठाउने',
+  7: 'अन्य'
 };
 
 function normalizeFinalDecisionType(value) {
@@ -1131,7 +1177,7 @@ const LOCATION_FIELDS = {
   },
   DISTRICTS: {
     1: ["इलाम", "झापा", "ताप्लेजुङ", "पाँचथर", "ओखलढुङ्गा", "खोटाङ", "सोलुखुम्बु", "सुनसरी", "तेह्रथुम", "संखुवासभा", "भोजपुर", "धनकुटा", "मोरङ", "उदयपुर"],
-    2: ["सप्तरी", "सिराहा", "धनुषा", "महोत्तरी", "सर्लाही", "रौतहट", "बारा", "पर्सा"],
+    2: ["सप्तरी", "सिरहा", "धनुषा", "महोत्तरी", "सर्लाही", "रौतहट", "बारा", "पर्सा"],
     3: ["सिन्धुपाल्चोक", "चितवन", "मकवानपुर", "भक्तपुर", "ललितपुर", "काठमाडौं", "नुवाकोट", "रसुवा", "धादिङ", "काभ्रेपलाञ्चोक", "सिन्धुली", "रामेछाप", "दोलखा"],
     4: ["गोरखा", "कास्की", "तनहुँ", "लमजुङ", "स्याङ्जा", "मनाङ", "मुस्ताङ", "बाग्लुङ", "पर्वत", "म्याग्दी", "नवलपरासी (बर्दघाट सुस्ता पूर्व)"],
     5: ["गुल्मी", "पाल्पा", "रुपन्देही", "कपिलवस्तु", "नवलपरासी (बर्दघाट सुस्ता पश्चिम)", "अर्घाखाँची", "बाँके", "बर्दिया", "दाङ", "रुकुम (पूर्व)", "रोल्पा", "प्युठान"],
@@ -1146,67 +1192,66 @@ const LOCATION_FIELDS = {
       "धनकुटा": ["चौबिसे", "छथर जोरपाटी", "धनकुटा", "महालक्ष्मी", "पाखरिबास", "साँगुरीगढी", "शहिदभूमि"],
       "इलाम": ["चुलाचुली", "देउमाई", "फाकफोक्थुम", "इलाम", "माई", "माइजोगमाई", "मङ्गेबुङ", "रोङ", "सन्दकपुर", "सूर्योदय"],
       "झापा": ["अर्जुनधारा", "बाह्रदशी", "भद्रपुर", "बिर्तामोड", "बुद्धशान्ति", "दमक", "गौराधा", "गौरीगञ्ज", "हल्दिबारी", "झापा", "कचनकवल", "कमल", "कनकाई", "मेचीनगर", "शिवसताक्सी"],
-      "खोटाङ": ["ऐसेलुखर्क", "बराहापोखरी", "दिक्तेल रुपाकोट मझुवागढी", "डिप्रुङ", "हलेसी तुवाचुङ", "जानतेढुङ्गा", "केपिलासगढी", "खोटेहाङ", "रवा बेसी", "साकेला"],
+      "खोटाङ": ["ऐसेलुखर्क", "बराहपोखरी", "दिक्तेल रुपाकोट मझुवागढी", "डिप्रुङ", "हलेसी तुवाचुङ", "जानतेढुङ्गा", "केपिलासगढी", "खोटेहाङ", "रवा बेसी", "साकेला"],
       "मोरङ": ["बेलबारी", "विराटनगर", "बुढीगंगा", "धनपालथान", "ग्रामथान", "जहादा", "कानेपोखरी", "कटहरी", "केराबारी", "लेटाङ", "मिक्लाजुङ", "पथरी शनिश्चरे", "रंगेली", "रतुवामाई", "सुन्दरहरैचा", "सुनवर्शी", "उरालाबारी"],
       "ओखलढुङ्गा": ["चम्पादेवी", "चिसंखुगढी", "खिजिदेम्बा", "लिखु", "मानेभञ्ज्याङ", "मोलुङ", "सिद्धिचरण", "सुनकोशी"],
       "पाँचथर": ["फालेलुङ", "फाल्गुनन्द", "हिलिहाङ", "कुमायक", "मिक्लाजुङ", "फिदिम", "तुम्बेवा", "याङ्गवारक"],
       "संखुवासभा": ["भोटखोला", "चैनपुर", "चिचिला", "धर्मदेवी", "खाँदबारी", "माडी", "मकालु", "पञ्चखापन", "सभापोखरी", "सिलिचङ"],
-      "सोलुखुम्बु": ["खुम्बुपसङ्लाहमु", "लिखुपिके", "माप्या दुधकोशी", "महाकुलुङ", "नेचासल्यान", "सोलुदुधाकुण्ड", "खोटाङ", "थुलुङ दुधकोशी"],
+      "सोलुखुम्बु": ["खुम्बुपसङ्लाहमु", "लिखुपिके", "माप्या दुधकोशी", "महाकुलुङ", "नेचासल्यान", "सोलुदुधकुण्ड", "खोटाङ", "थुलुङ दुधकोशी"],
       "तेह्रथुम": ["आठराई", "छथर", "लालीगुराँस", "मेन्चायम", "म्याङलुङ", "फेडाप"],
       "सुनसरी": ["बराहक्षेत्र", "बर्जु", "भोक्राहा नरसिङ्ग", "देवानगन्ज", "धरान", "दुहबी", "गढी", "हरिनगर", "इनरुवा", "इटहरी", "कोशी", "रामधुनी"],
-      "उदयपुर": ["बेलका", "चौदण्डीगढी", "कटारी", "लिम्चुङबुङ", "रौतामाई", "तापली", "त्रियुग", "उदयपुरगढी"]
+      "उदयपुर": ["बेलका", "चौदण्डीगढी", "कटारी", "लिम्चुङबुङ", "रौतामाई", "तापली", "त्रियुगा", "उदयपुरगढी"]
     },
     2: {
-      "सप्तरी": ["अग्निशैर कृष्ण सावरण", "बालन बिहुल", "विष्णुपुर", "बोडे बार्सैन", "छिन्नमस्ता", "डाक्नेश्वरी", "हनुमाननगर कंकालिनी", "कञ्चनरुप", "खडक", "महादेव", "राजविराज", "राजगढ", "रुपानी", "सप्तकोशी", "शम्भुनाथ", "सुरुङ्गा", "तिलाठी कोइलाडी", "तिराहुत"],
-      "सिराहा": ["अर्नामा", "औरही", "बरियारपट्टी", "भगवानपुर", "विष्णुपुर", "धनगढीमाई", "गोलबजार", "कल्याणपुर", "कर्जन्हा", "लहान", "लक्ष्मीपुर पटारी", "मिर्चैया", "नरहा", "नवराजपुर", "सखुवानङ्करकट्टी", "सिरहा", "सुखीपुर"],
-      "धनुषा": ["औराही", "बटेश्वर", "बिदेह", "क्षिरेश्वरनाथ", "धनौजी", "धनुषाधाम", "गणेशमान चारनाथ", "हंसपुर", "जनकनन्दनी", "जनकपुरधाम", "कमला", "लक्ष्मीनिया", "मिथिला", "मिथिला बिहारी", "मुखियापट्टी मुसरमिया", "नगराई", "सबाइला", "सहिदनगर"],
-      "महोत्तरी": ["औरही", "बलवा", "बर्दिवास", "भङ्गाहा", "एकडानरा", "गौशाला", "जलेश्वर", "लोहारपट्टी", "महोत्तरी", "मनरा सिसवा", "मटिहानी", "पिपरा", "रामगोपालपुर", "सम्सी", "सोनामा"],
+      "सप्तरी": ["अग्निशैर कृष्ण सावरण", "बालन बिहुल", "विष्णुपुर", "बोदे बरसाइन", "छिन्नमस्ता", "डाक्नेश्वरी", "हनुमाननगर कंकालिनी", "कञ्चनरुप", "खडक", "महादेव", "राजविराज", "राजगढ", "रुपानी", "सप्तकोशी", "शम्भुनाथ", "सुरुङ्गा", "तिलाठी कोइलाडी", "तिराहुत"],
+      "सिरहा": ["अर्नामा", "औरही", "बरियारपट्टी", "भगवानपुर", "विष्णुपुर", "धनगढीमाई", "गोलबजार", "कल्याणपुर", "कर्जन्हा", "लहान", "लक्ष्मीपुर पटारी", "मिर्चैया", "नरहा", "नवराजपुर", "सखुवानङ्करकट्टी", "सिरहा", "सुखीपुर"],
+      "धनुषा": ["औराही", "बटेश्वर", "बिदेह", "क्षिरेश्वरनाथ", "धनौजी", "धनुषाधाम", "गणेशमान चारनाथ", "हंसपुर", "जनकनन्दनी", "जनकपुरधाम", "कमला", "लक्ष्मीनिया", "मिथिला", "मिथिला बिहारी", "मुखियापट्टी मुसरमिया", "नगराई", "सबैला", "सहिदनगर"],
+      "महोत्तरी": ["औरही", "बलवा", "बर्दिवास", "भङ्गाहा", "एकडारा", "गौशाला", "जलेश्वर", "लोहारपट्टी", "महोत्तरी", "मनरा सिसवा", "मटिहानी", "पिपरा", "रामगोपालपुर", "सम्सी", "सोनामा"],
       "सर्लाही": ["बागमती", "बलरा", "बराहथवा", "बासबरिया", "विष्णु", "ब्रम्हपुरी", "चक्रघट्टा", "चन्द्रनगर", "धनकौल", "गोदैता", "हरिपुर", "हरिपुरवा", "हरिवान", "ईश्वरपुर", "कबिलासी", "कौडेना", "लालबन्दी", "मलङ्गवा", "पर्सा", "रामनगर"],
-      "बारा": ["आदर्श कोतवाल", "बारागढी", "बिश्रामपुर", "देवтал", "जितपुरसिमारा", "कलैया", "करैयामाई", "कोल्हाबी", "महागढीमाई", "निजगढ", "पचरौता", "परवानीपुर", "फेटा", "प्रसौनी", "सिम्रौनगढ", "सुवर्ण"],
-      "पर्सा": ["बहुदरमाई", "बिन्दवासिनी", "वीरगन्ज", "छिपहरमाई", "धोबिनी", "जगरनाथपुर", "जिरभवानी", "कालिकामाई", "पकाहा मेनपुर", "पर्सागढी", "पटेरवा सुगौली", "पोखरिया", "सखुवा प्रसौनी", "थोरी"],
-      "रौतहट": ["बौधिमाई", "वृन्दबन", "चन्द्रपुर", "देवाही गोनाही", "दुर्गा भगवती", "गढीमाई", "गरुड", "गौर", "गुजरा", "ईशानाथ", "कटहरिया", "माधव नारायण", "मौलापुर", "पारोहा", "विजयपुर फटुवा", "राजदेवी", "राजपुर", "यमुनामाई"]
+      "बारा": ["आदर्श कोतवाल", "बारागढी", "बिश्रामपुर", "देवताल", "जितपुरसिमारा", "कलैया", "करैयामाई", "कोल्हबी", "महागढीमाई", "निजगढ", "पचरौता", "परवानीपुर", "फेटा", "प्रसौनी", "सिम्रौनगढ", "सुवर्ण"],
+      "पर्सा": ["बहुदरमाई", "बिन्दवासिनी", "वीरगन्ज", "छिपहरमाई", "धोबिनी", "जगरनाथपुर", "जिराभवानी", "कालिकामाई", "पकाहा मैनपुर", "पर्सागढी", "पर्टेवा सुगौली", "पोखरिया", "सखुवा प्रसौनी", "ठोरी"],
+      "रौतहट": ["बौधिमाई", "वृन्दाबन", "चन्द्रपुर", "देवाही गोनाही", "दुर्गा भगवती", "गढीमाई", "गरुड", "गौर", "गुजरा", "ईशनाथ", "कटहरिया", "माधव नारायण", "मौलापुर", "पारोहा", "विजयपुर फतुवा", "राजदेवी", "राजपुर", "यमुनामाई"]
     },
     3: {
       "भक्तपुर": ["भक्तपुर", "चाँगुनारायण", "मध्यपुरथिमि", "सूर्यविनायक"],
       "चितवन": ["भरतपुर", "इच्छाकामना", "कालिका", "खैरहनी", "माडी", "राप्ती", "रत्ननगर"],
-      "धादिङ": ["बेनिघाट रोराङ", "धुनिबेसी", "गजुरी", "गाल्ची", "गंगाजमुना", "ज्वालामुखी", "खनियाबास", "नेत्रावती डब्जोङ", "नीलकण्ठ", "रुबी उपत्यका", "सिद्धलेक", "ठाकरे", "त्रिपुरा सुन्दरी"],
-      "दोलखा": ["बैतेश्वर", "भीमेश्वर", "बिगु", "गौरीशंकर", "जिरी", "कालिञ्चोक", "मेलुङ", "सेलुङ", "तामाकोशी"],
+      "धादिङ": ["बेनिघाट रोराङ", "धुनिबेसी", "गजुरी", "गल्छी", "गंगाजमुना", "ज्वालामुखी", "खनियाबास", "नेत्रावती डब्जोङ", "नीलकण्ठ", "रुबी उपत्यका", "सिद्धलेक", "ठाकरे", "त्रिपुरा सुन्दरी"],
+      "दोलखा": ["बैतेश्वर", "भीमेश्वर", "बिगु", "गौरीशंकर", "जिरी", "कालिञ्चोक", "मेलुङ", "सैलुङ", "तामाकोशी"],
       "काठमाडौं": ["बुढानिलकण्ठ", "चन्द्रागिरि", "दक्षिणकाली", "गोकर्णेश्वर", "कागेश्वरी मनहोरा", "काठमाडौं", "कीर्तिपुर", "नागार्जुन", "शंखरापुर", "तारकेश्वर", "टोखा"],
       "काभ्रेपलाञ्चोक": ["बनेपा", "बेथानचोक", "भुम्लु", "चौरीदेउराली", "धुलिखेल", "खानीखोला", "महाभारत", "मण्डनदेउपुर", "नमोबुद्ध", "पनौती", "पाँचखाल", "रोशी", "तेमल"],
       "ललितपुर": ["बागमती", "गोदावरी", "कोन्ज्योसोम", "ललितपुर", "महालक्ष्मी", "महांकाल"],
-      "मकवानपुर": ["बागमती", "बकैया", "भीमफेदी", "हेटौंडा", "इन्द्रसरोवर", "कैलाश", "मकवानपुरगढी", "मनहरी", "रक्सिराङ", "थाहा"],
       "नुवाकोट": ["बेलकोटगढी", "बिदुर", "दुप्चेश्वर", "ककनी", "किस्पाङ", "लिखु", "म्यागाङ", "पञ्चकन्या", "शिवपुरी", "सुर्यगढी", "ताडी", "तारकेश्वर"],
       "रामेछाप": ["दोरम्बा", "गोकुलगंगा", "खाडादेवी", "लिखु तामाकोशी", "मन्थली", "रामेछाप", "सुनापति", "उमाकुण्ड"],
       "रसुवा": ["अमाकोडिङमो", "गोसाइकुण्ड", "कालिका", "नौकुण्ड", "उत्तरगया"],
-      "सिन्धुली": ["दुधौली", "घाङ्लेख", "गोलन्जोर", "हरिहरपुरगढी", "कमलामाई", "मारिन", "फिक्कल", "सुनकोशी", "तिनपाटन"],
+      "सिन्धुली": ["दुधौली", "घाङ्लेख", "गोलन्जोर", "हरिहरपुरगढी", "कमलामाई", "मरिन", "फिक्कल", "सुनकोशी", "तिनपाटन"],
       "सिन्धुपाल्चोक": ["बलेफी", "बाह्रबिसे", "भोटेकोशी", "चौतारा साँगाचोकगढी", "हेलम्बु", "इन्द्रावती", "जुगल", "लिसाङ्खु", "मेलम्ची", "पाँचपोखरी थाङ्पाल", "सुनकोशी", "त्रिपुरासुन्दरी"]
     },
     4: {
-      "बाग्लुङ": ["बडिगाड", "बाग्लुङ", "बरेङ", "ढोरपाटन", "गलकोट", "जैमुनी", "कान्ठेखोला", "निसिखोला", "तमन खोला", "तारा खोला"],
+      "बाग्लुङ": ["बडिगाड", "बाग्लुङ", "बरेङ", "ढोरपाटन", "गलकोट", "जैमुनी", "कान्ठेखोला", "निसिखोला", "तमान खोला", "तारा खोला"],
       "गोरखा": ["आरुघाट", "अजिरकोट", "बारपाक सुलिकोट", "भीमसेनथापा", "चुम नुब्रि", "धार्चे", "गण्डकी", "गोरखा", "पालुङटार", "सहिद लखन", "सिरञ्चोक"],
       "कास्की": ["अन्नपूर्ण", "माछापुच्छ्रे", "माडी", "पोखरा", "रुपा"],
       "लमजुङ": ["बेशिशहर", "दोर्दी", "दूधपोखरी", "क्वालासोथर", "मध्यनेपाल", "मर्स्याङ्दी", "रैनास", "सुन्दरबजार"],
       "मनाङ": ["चामे", "मनाङ इङ्स्याङ", "नरपा भूमि", "नरशोन"],
       "मुस्ताङ": ["घरापझोङ", "लो घेकर दामोदरकुण्ड", "लोमान्थाङ", "थासाङ", "वारागुङ मुक्तिक्षेत्र"],
-      "म्याग्दी": ["अन्नपूर्ण", "बेनी", "धौलागिरी", "मलिका", "मंगला", "रघुगंगा"],
-      "नवलपरासी (बर्दघाट सुस्ता पूर्व)": ["बौदेकाली", "बिनयी", "बुलिङटार", "देवचुली", "गैडाकोट", "हुप्सेकोट", "कावासोती", "मध्यविन्दु"],
+      "म्याग्दी": ["अन्नपूर्ण", "बेनी", "धौलागिरी", "मालिका", "मंगला", "रघुगंगा"],
+      "नवलपरासी (बर्दघाट सुस्ता पूर्व)": ["बौदेकाली", "बिनयी", "बुलिङटार", "देवचुली", "गैंडाकोट", "हुप्सेकोट", "कावासोती", "मध्यविन्दु"],
       "पर्वत": ["बिहादी", "जलजला", "कुश्मा", "महाशिला", "मोदी", "पाइन्यु", "फलेबास"],
       "स्याङ्जा": ["आँधीखोला", "अर्जुनचौपरी", "भिरकोट", "बिरुवा", "चापाकोट", "गल्याङ", "हरिनास", "कालीगण्डगी", "फेदीखोला", "पुतलीबजार", "वालिङ"],
-      "तनहुँ": ["अन्बुखैरेनी", "बन्दीपुर", "भानु", "भीमद", "ब्यास", "देवघाट", "घिरिङ", "म्याग्दे", "रिसिङ", "शुक्लागण्डकी"]
+      "तनहुँ": ["आँबुखैरेनी", "बन्दीपुर", "भानु", "भीमाद", "ब्यास", "देवघाट", "घिरिङ", "म्याग्दे", "रिसिङ", "शुक्लागण्डकी"]
     },
     5: {
-      "अर्घाखाँची": ["भुमेकस्थान", "छत्रदेव", "मलारानी", "पाणिनी", "सन्धिखर्क", "सितगंगा"],
+      "अर्घाखाँची": ["भुमिकास्थान", "छत्रदेव", "मलारानी", "पाणिनी", "सन्धिखर्क", "सितगंगा"],
       "बाँके": ["बैजनाथ", "डुडुवा", "जानकी", "खजुरा", "कोहलपुर", "नरैनापुर", "नेपालगन्ज", "राप्ती सोनारी"],
       "बर्दिया": ["बढैयाताल", "बाँसगढी", "बारबर्दिया", "गेरुवा", "गुलरिया", "मधुवन", "राजापुर", "ठाकुरबाबा"],
       "दाङ": ["बबई", "बंगलाचुली", "दंगिशरण", "गढवा", "घोराही", "लमही", "राजपुर", "राप्ती", "शान्तिनगर", "तुलसीपुर"],
-      "गुल्मी": ["चन्द्रकोट", "चत्रकोट", "गुल्मीदरबार", "इस्मा", "कालीगण्डकी", "मदने", "मलिका", "मुसिकोट", "रेसुंगा", "रुरु", "सत्यवती"],
+      "गुल्मी": ["चन्द्रकोट", "छत्रकोट", "गुल्मीदरबार", "इस्मा", "कालीगण्डकी", "मदाने", "मलिका", "मुसिकोट", "रेसुंगा", "रुरु", "सत्यवती"],
       "कपिलवस्तु": ["बाणगंगा", "विजयनगर", "बुद्धभूमि", "कपिलवस्तु", "कृष्णनगर", "महाराजगन्ज", "मायादेवी", "शिवराज", "शुद्धोधन", "यशोधरा"],
-      "नवलपरासी (बर्दघाट सुस्ता पश्चिम)": ["बर्दघाट", "पाल्ही नन्दन", "प्रतापपुर", "रामग्राम", "सरवल", "सुनवल", "सुस्ता"],
-      "पाल्पा": ["बागनास्कली", "मठगढी", "निस्दी", "पूर्वखोला", "रैनादेवी", "रम्भा", "रामपुर", "रिब्दीकोट", "तानसेन", "तिनाउ"],
-      "प्युठान": ["आइराबत", "गौमुखी", "झिमरुक", "मल्लरानी", "मांडवी", "नौबहिनी", "प्युठान", "सरूमरानी", "स्वर्गद्वारी"],
+      "नवलपरासी (बर्दघाट सुस्ता पश्चिम)": ["बर्दघाट", "पाल्हीनन्दन", "प्रतापपुर", "रामग्राम", "सरवल", "सुनवल", "सुस्ता"],
+      "पाल्पा": ["बगनासकाली", "माथागढी", "निस्दी", "पूर्वखोला", "रैनादेवी", "रम्भा", "रामपुर", "रिब्दीकोट", "तानसेन", "तिनाउ"],
+      "प्युठान": ["ऐरावती", "गौमुखी", "झिमरुक", "मालारानी", "माण्डवी", "नौबहिनी", "प्युठान", "सरूमारानी", "स्वर्गद्वारी"],
       "रोल्पा": ["गंगादेव", "लुङ्गरी", "माडी", "परिवर्तन", "रोल्पा", "रुन्टीगढी", "सुनछहरी", "सुनिल स्मृति", "थवाङ", "त्रिवेणी"],
       "रुकुम (पूर्व)": ["भुमे", "पुथा उत्तरगंगा", "सिस्ने"],
-      "रुपन्देही": ["बुटवल", "देवदह", "गैडहवा", "कञ्चन", "कोटाहिमाई", "लुम्बिनी संस्कृत", "मार्चवारी", "मायादेवी", "ओमसतिया", "रोहिणी", "सैनामैना", "समरीमाइ", "सिद्धार्थनगर", "सियारी", "शुद्धोधन", "तिलोतमा"]
+      "रुपन्देही": ["बुटवल", "देवदह", "गैडहवा", "कञ्चन", "कोटाहिमाई", "लुम्बिनी साँस्कृतिक", "मार्चवारी", "मायादेवी", "ओमसतिया", "रोहिणी", "सैनामैना", "समरीमाइ", "सिद्धार्थनगर", "सियारी", "शुद्धोधन", "तिलोत्तमा"]
     },
     6: {
       "दैलेख": ["आठबिस", "भगवतीमाई", "भैरवी", "चामुण्डा बिन्द्रसैनी", "दुल्लु", "डुङ्गेश्वर", "गुराँस", "महाबु", "नारायण", "नौमुले", "ठान्टिकाण्ड"],
@@ -1425,16 +1470,53 @@ function _initializeNepaliDropdowns() {
         nepaliMonths.forEach((m, i) => { const o = document.createElement('option'); o.value = i + 1; o.textContent = m; monthEl.appendChild(o); });
       }
 
-      // determine initial values
+      // determine initial values with robust parsing for corrupted dates
       const hasHiddenValue = !!(hidden && hidden.value);
-      const val = hasHiddenValue ? hidden.value : '';
+      let val = hasHiddenValue ? (typeof _devnagariToLatin === 'function' ? _devnagariToLatin(hidden.value) : hidden.value) : '';
+
+      // Handle corrupted dates like '६६८५१' - validate and clean the date
+      if (val) {
+        // Remove any non-digit characters except hyphens
+        val = val.replace(/[^\d\-]/g, '');
+
+        // Check for corrupted patterns (e.g., single number like '66851')
+        if (!val.includes('-') && /^\d+$/.test(val)) {
+          const num = parseInt(val, 10);
+          // If it's a 4-5 digit year-like number, treat as invalid
+          if (num >= 1000 && num <= 99999) {
+            console.warn(`Invalid date format detected: ${hidden.value} -> ${val}, treating as empty`);
+            val = '';
+          }
+        }
+
+        // Validate year-month-day format
+        if (val) {
+          const parts = val.split('-');
+          if (parts.length === 3) {
+            const year = parseInt(parts[0], 10);
+            const month = parseInt(parts[1], 10);
+            const day = parseInt(parts[2], 10);
+
+            // Validate ranges
+            if (year < 2000 || year > 2100 || month < 1 || month > 12 || day < 1 || day > 32) {
+              console.warn(`Invalid date values detected: ${hidden.value} -> ${val}, treating as empty`);
+              val = '';
+            }
+          } else {
+            // Not proper YYYY-MM-DD format
+            console.warn(`Invalid date format: ${hidden.value} -> ${val}, treating as empty`);
+            val = '';
+          }
+        }
+      }
+
       const parts = (val || '').split('-');
-      const initY = parts[0] || cy;
+      const initY = parts[0] ? parseInt(parts[0], 10) : cy;
       const initM = parseInt(parts[1] || '1', 10);
       const initD = parseInt(parts[2] || '1', 10);
 
-      // If hidden has a value, initialize selects to that value; otherwise keep placeholder (empty)
-      if (hasHiddenValue) {
+      // If hidden has a valid value, initialize selects to that value; otherwise keep placeholder (empty)
+      if (hasHiddenValue && val) {
         if (yearEl) yearEl.value = initY;
         if (monthEl) monthEl.value = initM;
       }
@@ -1448,8 +1530,8 @@ function _initializeNepaliDropdowns() {
         for (let dd = 1; dd <= total; dd++) {
           const o = document.createElement('option'); o.value = dd; o.textContent = _latinToDevnagari(String(dd)); dayEl.appendChild(o);
         }
-        // If hidden had a value, set the day; otherwise keep placeholder selected
-        if (hasHiddenValue) {
+        // If hidden had a valid value, set the day; otherwise keep placeholder selected
+        if (hasHiddenValue && val) {
           const curD = initD || selectDay || 1;
           dayEl.value = Math.min(curD, total);
         } else {
@@ -1472,7 +1554,8 @@ function _initializeNepaliDropdowns() {
         const yy = String(yearEl.value).padStart(4, '0');
         const mm = String(monthEl.value).padStart(2, '0');
         const dd = String(dayEl.value).padStart(2, '0');
-        hidden.value = `${yy}-${mm}-${dd}`;
+        const dateStr = `${yy}-${mm}-${dd}`;
+        hidden.value = typeof _latinToDevnagari === 'function' ? _latinToDevnagari(dateStr) : dateStr;
         hidden.dispatchEvent(new Event('input', { bubbles: true }));
         hidden.dispatchEvent(new Event('change', { bubbles: true }));
       }
@@ -1481,8 +1564,8 @@ function _initializeNepaliDropdowns() {
       if (monthEl) monthEl.addEventListener('change', () => { refreshDays(parseInt(yearEl.value, 10), parseInt(monthEl.value, 10), 1); updateHidden(); });
       if (dayEl) dayEl.addEventListener('change', updateHidden);
 
-      // initial sync: update hidden only if selects had values (preserves placeholder when none)
-      if (hasHiddenValue) updateHidden();
+      // initial sync: update hidden only if selects had valid values (preserves placeholder when none)
+      if (hasHiddenValue && val) updateHidden();
       // mark as initialized to prevent duplicate listeners on repeated calls
       wrapper.dataset.ndpDropdownInit = 'true';
     } catch (e) {
@@ -5214,7 +5297,22 @@ function toggleSelectAll(masterCheckbox) {
 function getSelectedComplaints() {
   const checkboxes = document.querySelectorAll('.complaint-select:checked');
   const selectedIds = Array.from(checkboxes).map(cb => cb.getAttribute('data-id'));
-  return state.complaints.filter(c => selectedIds.includes(c.id));
+  
+  // Create a map for O(1) lookup
+  const complaintMap = {};
+  state.complaints.forEach(c => {
+    complaintMap[c.id] = c;
+  });
+  
+  // Return complaints in the order they were selected (checkbox order)
+  const selectedComplaints = [];
+  selectedIds.forEach(id => {
+    if (complaintMap[id]) {
+      selectedComplaints.push(complaintMap[id]);
+    }
+  });
+  
+  return selectedComplaints;
 }
 
 function exportSelectedComplaintsPDF() {
@@ -5530,7 +5628,7 @@ function createPDFHTML(complaints, mahashakhaName, shakhaName, nepaliDate, meeti
       </div>
     </div>
     
-    <table style="width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 12px;">
+    <table style="width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 13px;">
       <thead>
         <tr style="background-color: #f5f5f5; border: 1px solid #ddd;">
           <th style="border: 1px solid #ddd; padding: 8px; text-align: left; font-weight: bold;">क्र.सं.</th>
@@ -5550,15 +5648,15 @@ function createPDFHTML(complaints, mahashakhaName, shakhaName, nepaliDate, meeti
   complaints.forEach((complaint, index) => {
     html += `
       <tr style="border: 1px solid #ddd;">
-        <td style="border: 1px solid #ddd; padding: 8px; vertical-align: top; font-size: 12px;">${index + 1}</td>
-        <td style="border: 1px solid #ddd; padding: 8px; vertical-align: top; font-size: 12px;">${complaint.id || '-'}</td>
-        <td style="border: 1px solid #ddd; padding: 8px; vertical-align: top; font-size: 12px;">${cleanDateDisplay(complaint.date) || '-'}</td>
-        <td style="border: 1px solid #ddd; padding: 8px; vertical-align: top; font-size: 12px;">${complaint.complainant || '-'}</td>
-        <td style="border: 1px solid #ddd; padding: 8px; vertical-align: top; font-size: 12px;">${complaint.accused || '-'}</td>
-        <td style="border: 1px solid #ddd; padding: 8px; vertical-align: top; font-size: 12px; word-wrap: break-word;">${complaint.description || '-'}</td>
-        <td style="border: 1px solid #ddd; padding: 8px; vertical-align: top; font-size: 12px; word-wrap: break-word;">${complaint.committeeDecision || '-'}</td>
-        <td style="border: 1px solid #ddd; padding: 8px; vertical-align: top; font-size: 12px;">${complaint.ministry || complaint['मन्त्रालय/निकाय'] || '-'}</td>
-        <td style="border: 1px solid #ddd; padding: 8px; vertical-align: top; font-size: 12px;">${complaint.remarks || '-'}</td>
+        <td style="border: 1px solid #ddd; padding: 8px; vertical-align: top; font-size: 13px;">${index + 1}</td>
+        <td style="border: 1px solid #ddd; padding: 8px; vertical-align: top; font-size: 13px;">${complaint.id || '-'}</td>
+        <td style="border: 1px solid #ddd; padding: 8px; vertical-align: top; font-size: 13px;">${cleanDateDisplay(complaint.date) || '-'}</td>
+        <td style="border: 1px solid #ddd; padding: 8px; vertical-align: top; font-size: 13px;">${complaint.complainant || '-'}</td>
+        <td style="border: 1px solid #ddd; padding: 8px; vertical-align: top; font-size: 13px;">${complaint.accused || '-'}</td>
+        <td style="border: 1px solid #ddd; padding: 8px; vertical-align: top; font-size: 13px; word-wrap: break-word;">${complaint.description || '-'}</td>
+        <td style="border: 1px solid #ddd; padding: 8px; vertical-align: top; font-size: 13px; word-wrap: break-word;">${complaint.committeeDecision || '-'}</td>
+        <td style="border: 1px solid #ddd; padding: 8px; vertical-align: top; font-size: 13px;">${complaint.ministry || complaint['मन्त्रालय/निकाय'] || '-'}</td>
+        <td style="border: 1px solid #ddd; padding: 8px; vertical-align: top; font-size: 13px;">${complaint.remarks || '-'}</td>
       </tr>
     `;
   });
@@ -7252,7 +7350,9 @@ function getAllUsers() {
     { code: 'technical_1', name: SHAKHA.TECHNICAL_1, username: 'technical1', password: 'nvc@2026', mahashakha: MAHASHAKHA.TECHNICAL, permissions: ['complaint_management', 'technical_inspection'] },
     { code: 'technical_2', name: SHAKHA.TECHNICAL_2, username: 'technical2', password: 'nvc@2026', mahashakha: MAHASHAKHA.TECHNICAL, permissions: ['complaint_management', 'technical_inspection'] },
     { code: 'technical_3', name: SHAKHA.TECHNICAL_3, username: 'technical3', password: 'nvc@2026', mahashakha: MAHASHAKHA.TECHNICAL, permissions: ['complaint_management', 'technical_inspection'] },
-    { code: 'technical_4', name: SHAKHA.TECHNICAL_4, username: 'technical4', password: 'nvc@2026', mahashakha: MAHASHAKHA.TECHNICAL, permissions: ['complaint_management', 'technical_inspection'] }
+    { code: 'technical_4', name: SHAKHA.TECHNICAL_4, username: 'technical4', password: 'nvc@2026', mahashakha: MAHASHAKHA.TECHNICAL, permissions: ['complaint_management', 'technical_inspection'] },
+    // Add suchana user for password verification
+    { code: 'info_collection', name: SHAKHA.INFO_COLLECTION, username: 'suchana', password: 'suchana', mahashakha: MAHASHAKHA.ADMIN_MONITORING, permissions: ['complaint_management'], role: 'shakha' }
   ];
 
   const mahashakhas = [
@@ -7277,6 +7377,8 @@ function findUserByCredentials(username, password) {
     { code: 'complaint_management', name: SHAKHA.COMPLAINT_MANAGEMENT, username: 'complaint_mgmt', password: 'nvc@2026', mahashakha: MAHASHAKHA.ADMIN_MONITORING, permissions: ['complaint_management'] },
     { code: 'finance', name: SHAKHA.FINANCE, username: 'finance', password: 'nvc@2026', mahashakha: MAHASHAKHA.ADMIN_MONITORING, permissions: ['complaint_management'] },
     { code: 'policy_monitoring', name: SHAKHA.POLICY_MONITORING, username: 'policy_mon', password: 'nvc@2026', mahashakha: MAHASHAKHA.POLICY_LEGAL, permissions: ['complaint_management'] },
+    // Add policy mon user with space for current logged in user
+    { code: 'policy_monitoring', name: SHAKHA.POLICY_MONITORING, username: 'policy mon', password: 'nvc123', mahashakha: MAHASHAKHA.POLICY_LEGAL, permissions: ['complaint_management'], role: 'shakha' },
     { code: 'investigation', name: SHAKHA.INVESTIGATION, username: 'investigation', password: 'nvc@2026', mahashakha: MAHASHAKHA.POLICY_LEGAL, permissions: ['complaint_management'] },
     { code: 'legal_advice', name: SHAKHA.LEGAL_ADVICE, username: 'legal_advice', password: 'nvc@2026', mahashakha: MAHASHAKHA.POLICY_LEGAL, permissions: ['complaint_management'] },
     { code: 'asset_declaration', name: SHAKHA.ASSET_DECLARATION, username: 'asset_decl', password: 'nvc@2026', mahashakha: MAHASHAKHA.POLICY_LEGAL, permissions: ['complaint_management'] },
@@ -7287,7 +7389,9 @@ function findUserByCredentials(username, password) {
     { code: 'technical_1', name: SHAKHA.TECHNICAL_1, username: 'technical1', password: 'nvc@2026', mahashakha: MAHASHAKHA.TECHNICAL, permissions: ['complaint_management', 'technical_inspection'] },
     { code: 'technical_2', name: SHAKHA.TECHNICAL_2, username: 'technical2', password: 'nvc@2026', mahashakha: MAHASHAKHA.TECHNICAL, permissions: ['complaint_management', 'technical_inspection'] },
     { code: 'technical_3', name: SHAKHA.TECHNICAL_3, username: 'technical3', password: 'nvc@2026', mahashakha: MAHASHAKHA.TECHNICAL, permissions: ['complaint_management', 'technical_inspection'] },
-    { code: 'technical_4', name: SHAKHA.TECHNICAL_4, username: 'technical4', password: 'nvc@2026', mahashakha: MAHASHAKHA.TECHNICAL, permissions: ['complaint_management', 'technical_inspection'] }
+    { code: 'technical_4', name: SHAKHA.TECHNICAL_4, username: 'technical4', password: 'nvc@2026', mahashakha: MAHASHAKHA.TECHNICAL, permissions: ['complaint_management', 'technical_inspection'] },
+    // Add suchana user for password verification
+    { code: 'info_collection', name: SHAKHA.INFO_COLLECTION, username: 'suchana', password: 'suchana', mahashakha: MAHASHAKHA.ADMIN_MONITORING, permissions: ['complaint_management'], role: 'shakha' }
   ];
 
   const mahashakhas = [
@@ -7982,7 +8086,7 @@ function initializeDashboardCharts() {
         else if (complaint.status === 'resolved') shakhaStats[shakha].resolved++;
       });
 
-      const shakhas = Object.keys(shakhaStats);
+      const shakhas = Object.keys(shakhaStats).filter(shakha => shakha !== 'अन्य');
       const pendingData = shakhas.map(shakha => shakhaStats[shakha].pending);
       const progressData = shakhas.map(shakha => shakhaStats[shakha].progress);
       const resolvedData = shakhas.map(shakha => shakhaStats[shakha].resolved);
@@ -8536,7 +8640,7 @@ function initializeDashboardCharts() {
         if (complaint.status === 'resolved') shakhaStats[shakha].resolved++;
       });
 
-      const labels = Object.keys(shakhaStats);
+      const labels = Object.keys(shakhaStats).filter(shakha => shakha !== 'अन्य');
       const data = labels.map(shakha => {
         const stats = shakhaStats[shakha];
         return stats.total > 0 ? Math.round((stats.resolved / stats.total) * 100) : 0;
@@ -9611,17 +9715,20 @@ function showAdminDashboard() {
   const pendingComplaints = state.complaints.filter(c => c.status === 'pending').length;
   const resolvedComplaints = state.complaints.filter(c => c.status === 'resolved').length;
   const monthlyComplaints = (() => {
-    const todayNepali = getCurrentNepaliDate(); // e.g., "2081-11-03"
+    const todayNepali = getCurrentNepaliDate();
     if (!todayNepali) return 0;
-    const yearMonth = todayNepali.substring(0, 7); // "2081-11"
+    const yearMonth = todayNepali.substring(0, 7);
     const startDate = `${yearMonth}-01`;
     const endDate = todayNepali;
 
-    const startAD = (typeof _parseComplaintRegDateToAD === 'function' && startDate) ? _parseComplaintRegDateToAD({ date: startDate }) : null;
-    const endAD = (typeof _parseComplaintRegDateToAD === 'function' && endDate) ? _parseComplaintRegDateToAD({ date: endDate }) : null;
+    const startAD = window.globalParseDateRobust(startDate);
+    const endAD = window.globalParseDateRobust(endDate);
+    if (endAD) endAD.setHours(23, 59, 59, 999);
 
     return state.complaints.filter(c => {
-      const cAD = (typeof _parseComplaintRegDateToAD === 'function') ? _parseComplaintRegDateToAD(c) : null;
+      const raw = window.globalGetComplaintDateRaw(c, 'date');
+      if (!raw) return false;
+      const cAD = window.globalParseDateRobust(raw);
       if (!cAD) return false;
       if (startAD && cAD < startAD) return false;
       if (endAD && cAD > endAD) return false;
@@ -9639,14 +9746,29 @@ function showAdminDashboard() {
   });
 
   // Fiscal Year Cutoff Logic
-  const cutoffDate = '2082-04-01';
+  const cutoffEndDate = '2082-03-31';
+  const cutoffEndAD = window.globalParseDateRobust(cutoffEndDate);
+  if (cutoffEndAD) cutoffEndAD.setHours(23, 59, 59, 999);
+
   const lastFyComplaints = state.complaints.filter(c => {
-    const d = normalizeNepaliDisplayToISO(c.date || c['दर्ता मिति']);
-    return d && d < cutoffDate;
+    const raw = window.globalGetComplaintDateRaw(c, 'date');
+    if (!raw) return false;
+    const cAD = window.globalParseDateRobust(raw);
+    if (!cAD) return false;
+    if (cutoffEndAD && cAD > cutoffEndAD) return false;
+    return true;
   }).length;
+
+  const cutoffStartDate = '2082-04-01';
+  const cutoffStartAD = window.globalParseDateRobust(cutoffStartDate);
+
   const thisFyComplaints = state.complaints.filter(c => {
-    const d = normalizeNepaliDisplayToISO(c.date || c['दर्ता मिति']);
-    return d && d >= cutoffDate;
+    const raw = window.globalGetComplaintDateRaw(c, 'date');
+    if (!raw) return false;
+    const cAD = window.globalParseDateRobust(raw);
+    if (!cAD) return false;
+    if (cutoffStartAD && cAD < cutoffStartAD) return false;
+    return true;
   }).length;
 
   return `
@@ -9840,6 +9962,54 @@ function showAdminPlanningDashboard() {
   const hotlineComplaints = filteredAllComplaints.filter(c => String(c.source).toLowerCase() === 'hotline');
   const pendingHotline = hotlineComplaints.filter(c => c.status === 'pending').length;
   const onlineComplaints = filteredAllComplaints.filter(c => ['online', 'online_complaint'].includes(String(c.source).toLowerCase()));
+  const planningComplaints = filteredAllComplaints.filter(c => ['online', 'online_complaint', 'hello_sarkar'].includes(String(c.source || '').toLowerCase()));
+
+  const monthlyComplaints = (() => {
+    const todayNepali = getCurrentNepaliDate();
+    if (!todayNepali) return 0;
+    const yearMonth = todayNepali.substring(0, 7);
+    const startDate = `${yearMonth}-01`;
+    const endDate = todayNepali;
+
+    const startAD = window.globalParseDateRobust(startDate);
+    const endAD = window.globalParseDateRobust(endDate);
+    if (endAD) endAD.setHours(23, 59, 59, 999);
+
+    return planningComplaints.filter(c => {
+      const raw = window.globalGetComplaintDateRaw(c, 'date');
+      if (!raw) return false;
+      const cAD = window.globalParseDateRobust(raw);
+      if (!cAD) return false;
+      if (startAD && cAD < startAD) return false;
+      if (endAD && cAD > endAD) return false;
+      return true;
+    }).length;
+  })();
+
+  const cutoffEndDate = '2082-03-31';
+  const cutoffEndAD = window.globalParseDateRobust(cutoffEndDate);
+  if (cutoffEndAD) cutoffEndAD.setHours(23, 59, 59, 999);
+
+  const lastFyComplaints = planningComplaints.filter(c => {
+    const raw = window.globalGetComplaintDateRaw(c, 'date');
+    if (!raw) return false;
+    const cAD = window.globalParseDateRobust(raw);
+    if (!cAD) return false;
+    if (cutoffEndAD && cAD > cutoffEndAD) return false;
+    return true;
+  }).length;
+
+  const cutoffStartDate = '2082-04-01';
+  const cutoffStartAD = window.globalParseDateRobust(cutoffStartDate);
+
+  const thisFyComplaints = planningComplaints.filter(c => {
+    const raw = window.globalGetComplaintDateRaw(c, 'date');
+    if (!raw) return false;
+    const cAD = window.globalParseDateRobust(raw);
+    if (!cAD) return false;
+    if (cutoffStartAD && cAD < cutoffStartAD) return false;
+    return true;
+  }).length;
 
   // Debug: detailed inspection for admin_plan issues
   try {
@@ -9983,17 +10153,20 @@ function showMahashakhaDashboard() {
   const pendingComplaints = mahashakhaComplaints.filter(c => c.status === 'pending').length;
   const resolvedComplaints = mahashakhaComplaints.filter(c => c.status === 'resolved').length;
   const monthlyComplaints = (() => {
-    const todayNepali = getCurrentNepaliDate(); // e.g., "2081-11-03"
+    const todayNepali = getCurrentNepaliDate();
     if (!todayNepali) return 0;
-    const yearMonth = todayNepali.substring(0, 7); // "2081-11"
+    const yearMonth = todayNepali.substring(0, 7);
     const startDate = `${yearMonth}-01`;
     const endDate = todayNepali;
 
-    const startAD = (typeof _parseComplaintRegDateToAD === 'function' && startDate) ? _parseComplaintRegDateToAD({ date: startDate }) : null;
-    const endAD = (typeof _parseComplaintRegDateToAD === 'function' && endDate) ? _parseComplaintRegDateToAD({ date: endDate }) : null;
+    const startAD = window.globalParseDateRobust(startDate);
+    const endAD = window.globalParseDateRobust(endDate);
+    if (endAD) endAD.setHours(23, 59, 59, 999);
 
     return mahashakhaComplaints.filter(c => {
-      const cAD = (typeof _parseComplaintRegDateToAD === 'function') ? _parseComplaintRegDateToAD(c) : null;
+      const raw = window.globalGetComplaintDateRaw(c, 'date');
+      if (!raw) return false;
+      const cAD = window.globalParseDateRobust(raw);
       if (!cAD) return false;
       if (startAD && cAD < startAD) return false;
       if (endAD && cAD > endAD) return false;
@@ -10016,14 +10189,29 @@ function showMahashakhaDashboard() {
   const shakhaOptions = myShakhas.map(s => `<option value="${s}">${s}</option>`).join('');
 
   // Fiscal Year Cutoff Logic
-  const cutoffDate = '2082-04-01';
+  const cutoffEndDate = '2082-03-31';
+  const cutoffEndAD = window.globalParseDateRobust(cutoffEndDate);
+  if (cutoffEndAD) cutoffEndAD.setHours(23, 59, 59, 999);
+
   const lastFyComplaints = mahashakhaComplaints.filter(c => {
-    const d = normalizeNepaliDisplayToISO(c.date || c['दर्ता मिति']);
-    return d && d < cutoffDate;
+    const raw = window.globalGetComplaintDateRaw(c, 'date');
+    if (!raw) return false;
+    const cAD = window.globalParseDateRobust(raw);
+    if (!cAD) return false;
+    if (cutoffEndAD && cAD > cutoffEndAD) return false;
+    return true;
   }).length;
+
+  const cutoffStartDate = '2082-04-01';
+  const cutoffStartAD = window.globalParseDateRobust(cutoffStartDate);
+
   const thisFyComplaints = mahashakhaComplaints.filter(c => {
-    const d = normalizeNepaliDisplayToISO(c.date || c['दर्ता मिति']);
-    return d && d >= cutoffDate;
+    const raw = window.globalGetComplaintDateRaw(c, 'date');
+    if (!raw) return false;
+    const cAD = window.globalParseDateRobust(raw);
+    if (!cAD) return false;
+    if (cutoffStartAD && cAD < cutoffStartAD) return false;
+    return true;
   }).length;
 
   return `
@@ -10284,14 +10472,29 @@ function showTechnicalDashboard() {
   const activeProjects = technicalProjects.filter(p => p.status === 'active').length;
 
   // Fiscal Year Cutoff Logic
-  const cutoffDate = '2082-04-01';
+  const cutoffEndDate = '2082-03-31';
+  const cutoffEndAD = window.globalParseDateRobust(cutoffEndDate);
+  if (cutoffEndAD) cutoffEndAD.setHours(23, 59, 59, 999);
+
   const lastFyComplaints = shakhaComplaints.filter(c => {
-    const d = normalizeNepaliDisplayToISO(c.date || c['दर्ता मिति']);
-    return d && d < cutoffDate;
+    const raw = window.globalGetComplaintDateRaw(c, 'date');
+    if (!raw) return false;
+    const cAD = window.globalParseDateRobust(raw);
+    if (!cAD) return false;
+    if (cutoffEndAD && cAD > cutoffEndAD) return false;
+    return true;
   }).length;
+
+  const cutoffStartDate = '2082-04-01';
+  const cutoffStartAD = window.globalParseDateRobust(cutoffStartDate);
+
   const thisFyComplaints = shakhaComplaints.filter(c => {
-    const d = normalizeNepaliDisplayToISO(c.date || c['दर्ता मिति']);
-    return d && d >= cutoffDate;
+    const raw = window.globalGetComplaintDateRaw(c, 'date');
+    if (!raw) return false;
+    const cAD = window.globalParseDateRobust(raw);
+    if (!cAD) return false;
+    if (cutoffStartAD && cAD < cutoffStartAD) return false;
+    return true;
   }).length;
 
   return `
@@ -10399,17 +10602,20 @@ function showShakhaDashboard() {
   const inProgressComplaints = shakhaComplaints.filter(c => c.status === 'progress').length;
   const resolvedComplaints = shakhaComplaints.filter(c => c.status === 'resolved').length;
   const monthlyComplaints = (() => {
-    const todayNepali = getCurrentNepaliDate(); // e.g., "2081-11-03"
+    const todayNepali = getCurrentNepaliDate();
     if (!todayNepali) return 0;
-    const yearMonth = todayNepali.substring(0, 7); // "2081-11"
+    const yearMonth = todayNepali.substring(0, 7);
     const startDate = `${yearMonth}-01`;
     const endDate = todayNepali;
 
-    const startAD = (typeof _parseComplaintRegDateToAD === 'function' && startDate) ? _parseComplaintRegDateToAD({ date: startDate }) : null;
-    const endAD = (typeof _parseComplaintRegDateToAD === 'function' && endDate) ? _parseComplaintRegDateToAD({ date: endDate }) : null;
+    const startAD = window.globalParseDateRobust(startDate);
+    const endAD = window.globalParseDateRobust(endDate);
+    if (endAD) endAD.setHours(23, 59, 59, 999);
 
     return shakhaComplaints.filter(c => {
-      const cAD = (typeof _parseComplaintRegDateToAD === 'function') ? _parseComplaintRegDateToAD(c) : null;
+      const raw = window.globalGetComplaintDateRaw(c, 'date');
+      if (!raw) return false;
+      const cAD = window.globalParseDateRobust(raw);
       if (!cAD) return false;
       if (startAD && cAD < startAD) return false;
       if (endAD && cAD > endAD) return false;
@@ -10526,14 +10732,29 @@ function showShakhaDashboard() {
   }
 
   // Fiscal Year Cutoff Logic
-  const cutoffDate = '2082-04-01';
+  const cutoffEndDate = '2082-03-31';
+  const cutoffEndAD = window.globalParseDateRobust(cutoffEndDate);
+  if (cutoffEndAD) cutoffEndAD.setHours(23, 59, 59, 999);
+
   const lastFyComplaints = shakhaComplaints.filter(c => {
-    const d = normalizeNepaliDisplayToISO(c.date || c['दर्ता मिति']);
-    return d && d < cutoffDate;
+    const raw = window.globalGetComplaintDateRaw(c, 'date');
+    if (!raw) return false;
+    const cAD = window.globalParseDateRobust(raw);
+    if (!cAD) return false;
+    if (cutoffEndAD && cAD > cutoffEndAD) return false;
+    return true;
   }).length;
+
+  const cutoffStartDate = '2082-04-01';
+  const cutoffStartAD = window.globalParseDateRobust(cutoffStartDate);
+
   const thisFyComplaints = shakhaComplaints.filter(c => {
-    const d = normalizeNepaliDisplayToISO(c.date || c['दर्ता मिति']);
-    return d && d >= cutoffDate;
+    const raw = window.globalGetComplaintDateRaw(c, 'date');
+    if (!raw) return false;
+    const cAD = window.globalParseDateRobust(raw);
+    if (!cAD) return false;
+    if (cutoffStartAD && cAD < cutoffStartAD) return false;
+    return true;
   }).length;
 
   return `
@@ -10748,9 +10969,9 @@ function showComplaintsView(initialFilters = {}) {
 
   const getComplaintDateRaw = (complaint, field) => {
     if (field === 'createdAt') {
-      return complaint['सिर्जना मिति'] || complaint.createdAt || complaint['created_at'] || complaint['सिर्जना'] || '';
+      return complaint.createdAt || complaint['सिर्जना मिति'] || complaint['created_at'] || complaint['सिर्जना'] || '';
     }
-    return complaint['दर्ता मिति'] || complaint.date || complaint.entryDate || complaint['Entry Date'] || '';
+    return complaint.date || complaint['दर्ता मिति'] || complaint.entryDate || complaint['Entry Date'] || '';
   };
 
   const getComplaintComparableDate = (complaint, field) => {
@@ -10827,28 +11048,36 @@ function showComplaintsView(initialFilters = {}) {
   console.log(`📊 Total complaints: ${complaintsToShow.length}`);
   console.log(`📊 Sorting by: ${sortField}, Order: ${sortOrder}`);
 
-  // Robust sorting with proper null handling
+  // Robust sorting using comparable date strings for better reliability
+  const getComplaintSortKey = (complaint, field) => {
+    const comparable = getComplaintComparableDate(complaint, field);
+    if (comparable) return comparable;
+
+    // Fallback to timestamp parsing
+    const raw = getComplaintDateRaw(complaint, field);
+    if (!raw) return '';
+    const d = parseDateRobust(raw);
+    return d ? d.getTime().toString() : '';
+  };
+
   complaintsToShow.sort((a, b) => {
-    const dateA = getComplaintComparableDate(a, sortField);
-    const dateB = getComplaintComparableDate(b, sortField);
+    const keyA = getComplaintSortKey(a, sortField);
+    const keyB = getComplaintSortKey(b, sortField);
 
     // Both have no date - keep original order
-    if (!dateA && !dateB) return 0;
+    if (!keyA && !keyB) return 0;
 
-    // Records without date should go to the END (not beginning)
-    // When sorting newest first: null dates go to end (return 1 for a, -1 for b)
-    // When sorting oldest first: null dates also go to end
-    if (!dateA) return 1;  // a has no date, push to end
-    if (!dateB) return -1; // b has no date, push a before b
+    // Records without date should go to the END
+    if (!keyA) return 1;  // a has no date, push to end
+    if (!keyB) return -1; // b has no date, push a before b
 
-    // Both have valid dates - compare them
-    // ISO date strings can be compared lexicographically (YYYY-MM-DD format)
+    // Both have valid keys - compare as strings (YYYY-MM-DD format is sortable)
     if (sortOrder === 'oldest') {
       // पुरानो -> नयाँ (ascending)
-      return dateA.localeCompare(dateB);
+      return keyA.localeCompare(keyB);
     } else {
       // नयाँ -> पुरानो (descending) - DEFAULT
-      return dateB.localeCompare(dateA);
+      return keyB.localeCompare(keyA);
     }
   });
 
@@ -11036,6 +11265,9 @@ function showComplaintsView(initialFilters = {}) {
                         <option value="तामेली" ${normalizeFinalDecisionType(finalDecisionTypeFilter) === 'तामेली' ? 'selected' : ''}>तामेली</option>
                         <option value="सुझाव/निर्देशन" ${normalizeFinalDecisionType(finalDecisionTypeFilter) === 'सुझाव/निर्देशन' ? 'selected' : ''}>सुझाव/निर्देशन</option>
                         <option value="सतर्क" ${normalizeFinalDecisionType(finalDecisionTypeFilter) === 'सतर्क' ? 'selected' : ''}>सतर्क</option>
+                        <option value="छानविन तथा कारबाही गरी जानकारी दिन लेखी पठाउने" ${normalizeFinalDecisionType(finalDecisionTypeFilter) === 'छानविन तथा कारबाही गरी जानकारी दिन लेखी पठाउने' ? 'selected' : ''}>छानविन तथा कारबाही गरी जानकारी दिन लेखी पठाउने</option>
+                        <option value="अ. दु. अ.आ. मा लेखि पठाउने" ${normalizeFinalDecisionType(finalDecisionTypeFilter) === 'अ. दु. अ.आ. मा लेखि पठाउने' ? 'selected' : ''}>अ. दु. अ.आ. मा लेखि पठाउने</option>
+                        <option value="छानविन तथा कारबाहीका लागि अन्य निकायमा पठाउने" ${normalizeFinalDecisionType(finalDecisionTypeFilter) === 'छानविन तथा कारबाहीका लागि अन्य निकायमा पठाउने' ? 'selected' : ''}>छानविन तथा कारबाहीका लागि अन्य निकायमा पठाउने</option>
                         <option value="अन्य" ${normalizeFinalDecisionType(finalDecisionTypeFilter) === 'अन्य' ? 'selected' : ''}>अन्य</option>
                     </select>
                     <select class="form-select form-select-sm" id="filterShakha" style="min-width: 120px;">
@@ -11758,7 +11990,14 @@ function editOnlineComplaint(id) {
     <div class="d-grid gap-3">
       <div class="d-grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
         <div class="form-group"><label class="form-label">उजुरी नं</label><input type="text" class="form-control" id="oc_id" value="${c.id || ''}" readonly /></div>
-        <div class="form-group"><label class="form-label">मिति</label><input type="text" class="form-control" id="oc_date" value="${c.date || ''}" /></div>
+        <div class="form-group"><label class="form-label">मिति</label>
+          <div class="d-flex gap-2 nepali-datepicker-dropdown" data-target="oc_date">
+            <select id="oc_date_year" class="form-select bs-year"><option value="">साल</option></select>
+            <select id="oc_date_month" class="form-select bs-month"><option value="">महिना</option></select>
+            <select id="oc_date_day" class="form-select bs-day"><option value="">गते</option></select>
+            <input type="hidden" id="oc_date" value="${c.date || ''}" />
+          </div>
+        </div>
       </div>
       <div class="d-grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
         <div class="form-group"><label class="form-label">उजुरकर्ता</label><input type="text" class="form-control" id="oc_complainant" value="${c.complainant || ''}" /></div>
@@ -12112,6 +12351,51 @@ function showNewComplaintView() {
         cursor: pointer;
         transition: all 0.2s ease;
       }
+      .similar-complaint-card {
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 6px;
+        padding: 8px 10px;
+        margin-bottom: 0; /* Grid gap handles spacing now */
+        box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+        transition: all 0.2s ease;
+      }
+      #similarComplaintsList {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); /* स्क्रिनको चौडाइ अनुसार स्वचालित रूपमा २ वा बढी कोलम (साँघुरोमा १ कोलम) */
+        gap: 6px;
+        max-height: 180px;
+        overflow-y: auto;
+        padding-right: 4px;
+      }
+      /* Custom Scrollbar for similar complaints list */
+      #similarComplaintsList::-webkit-scrollbar { width: 6px; }
+      #similarComplaintsList::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 4px; }
+      #similarComplaintsList::-webkit-scrollbar-thumb { background: #c1c1c1; border-radius: 4px; }
+      #similarComplaintsList::-webkit-scrollbar-thumb:hover { background: #a8a8a8; }
+      .highlight-keyword {
+        background-color: #fff9c4; /* Soft yellow background */
+        color: #d32f2f; /* Dark red text for visibility */
+        padding: 0 2px;
+        border-radius: 2px;
+        font-weight: 600;
+        box-shadow: 0 0 0 1px rgba(211, 47, 47, 0.1);
+      }
+      .similar-complaint-card:hover {
+        border-color: #f59e0b;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.08);
+      }
+      .similarity-score {
+        font-size: 0.75rem;
+        font-weight: 600;
+        background: #fffbeb;
+        color: #92400e;
+        padding: 3px 8px;
+        border: 1px solid #fef3c7;
+        border-radius: 12px;
+        display: inline-flex;
+        align-items: center;
+      }
       .hotspot-card:hover {
         transform: translateY(-2px);
         box-shadow: 0 4px 8px rgba(0,0,0,0.08);
@@ -12121,118 +12405,228 @@ function showNewComplaintView() {
         background-color: #dc3545;
       }
     </style>
-    <div class="card">
-      <div class="card-header"><h5 class="mb-0">नयाँ उजुरी दर्ता फारम</h5></div>
-      <div class="card-body">
-        <div class="d-grid gap-3" style="grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));">
-          <div class="form-group"><label class="form-label">दर्ता नं *</label><input type="text" class="form-control" id="complaintId" placeholder="NVC-YYYY-NNNN" /></div>
-          <div class="form-group">
-            <label class="form-label">दर्ता मिति *</label>
-            <div class="d-flex gap-2 nepali-datepicker-dropdown" data-target="complaintDate">
-              <select id="complaintDate_year" class="form-select bs-year" aria-label="वर्ष"></select>
-              <select id="complaintDate_month" class="form-select bs-month" aria-label="महिना"></select>
-              <select id="complaintDate_day" class="form-select bs-day" aria-label="दिन"></select>
+    <div class="card nvc-entry-card">
+      <!-- Card Header -->
+      <div class="card-header nvc-entry-header d-flex align-center justify-between" style="padding:10px 16px;">
+        <div class="d-flex align-center gap-2">
+          <span style="background:var(--primary,#c41e3a);color:#fff;width:32px;height:32px;border-radius:8px;display:inline-flex;align-items:center;justify-content:center;font-size:1rem;"><i class="fas fa-file-pen"></i></span>
+          <div>
+            <h5 class="mb-0" style="font-size:1rem;font-weight:700;">नयाँ उजुरी दर्ता फारम</h5>
+            <span class="text-xs text-muted">सबै * चिह्न भएका फिल्ड अनिवार्य छन्</span>
+          </div>
+        </div>
+        <span id="draftBadge" class="badge badge-warning hidden" style="font-size:0.7rem;"><i class="fas fa-clock"></i> ड्राफ्ट</span>
+      </div>
+
+      <div class="card-body" style="padding:14px 16px 10px;">
+
+        <!-- ══ Section 1: आधारभूत जानकारी ══ -->
+        <div class="nvc-section-divider" style="display:flex;align-items:center;gap:8px;margin:0 0 10px;">
+          <span style="background:#eef2ff;color:var(--primary, #133f81);padding:2px 10px;border-radius:20px;font-size:0.75rem;font-weight:600;white-space:nowrap;">
+            <i class="fas fa-info-circle" style="color:var(--primary, #133f81);"></i> आधारभूत जानकारी
+          </span>
+          <hr style="flex:1;border:none;border-top:1px dashed #e2e8f0;margin:0;">
+        </div>
+
+        <div class="nvc-form-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px 14px;margin-bottom:14px;">
+
+          <!-- दर्ता नं -->
+          <div class="form-group nvc-fg">
+            <label class="form-label nvc-label"><i class="fas fa-hashtag" style="color:var(--primary, #133f81);"></i> दर्ता नं <span class="req">*</span></label>
+            <input type="text" class="form-control nvc-input" id="complaintId" placeholder="NVC-YYYY-NNNN" autocomplete="off" />
+          </div>
+
+          <!-- दर्ता मिति -->
+          <div class="form-group nvc-fg">
+            <label class="form-label nvc-label"><i class="fas fa-calendar-day" style="color:var(--primary, #133f81);"></i> दर्ता मिति <span class="req">*</span></label>
+            <div class="d-flex gap-2 nepali-datepicker-dropdown" data-target="complaintDate" style="gap:6px;">
+              <select id="complaintDate_year" class="form-select nvc-select bs-year" aria-label="वर्ष"></select>
+              <select id="complaintDate_month" class="form-select nvc-select bs-month" aria-label="महिना"></select>
+              <select id="complaintDate_day" class="form-select nvc-select bs-day" aria-label="दिन"></select>
               <input type="hidden" id="complaintDate" value="${currentDate}" />
             </div>
             <div id="dateWarning" class="text-danger text-xs mt-1 hidden"><i class="fas fa-exclamation-triangle"></i> भविष्यको मिति चयन गरिएको छ</div>
           </div>
-          <div class="form-group"><label class="form-label">उजुरकर्ताको नाम *</label><input type="text" class="form-control" id="complainantName" placeholder="पूरा नाम" /></div>
-          <div class="form-group"><label class="form-label">विपक्षी</label><input type="text" class="form-control" id="accusedName" placeholder="विपक्षीको नाम" /></div>
-          <div class="form-group"><label class="form-label">मन्त्रालय/निकाय</label>
-            <select class="form-select" id="complaintMinistry">
+
+          <!-- उजुरकर्ताको नाम -->
+          <div class="form-group nvc-fg">
+            <label class="form-label nvc-label"><i class="fas fa-user" style="color:var(--primary, #133f81);"></i> उजुरकर्ताको नाम</label>
+            <input type="text" class="form-control nvc-input" id="complainantName" placeholder="पूरा नाम" autocomplete="off" />
+          </div>
+
+          <!-- विपक्षी -->
+          <div class="form-group nvc-fg">
+            <label class="form-label nvc-label"><i class="fas fa-user-slash" style="color:var(--primary, #133f81);"></i> विपक्षी <span class="req">*</span></label>
+            <input type="text" class="form-control nvc-input" id="accusedName" placeholder="विपक्षीको नाम" autocomplete="off" />
+          </div>
+
+          <!-- मन्त्रालय/निकाय -->
+          <div class="form-group nvc-fg">
+            <label class="form-label nvc-label"><i class="fas fa-building-columns" style="color:var(--primary, #133f81);"></i> मन्त्रालय/निकाय</label>
+            <select class="form-select nvc-select" id="complaintMinistry">
               <option value="">छान्नुहोस्</option>
               ${MINISTRIES.map(m => `<option value="${m}">${m}</option>`).join('')}
             </select>
           </div>
+
           ${state.currentUser.role === 'admin' ? `
-          <div class="form-group"><label class="form-label">सम्बन्धित शाखा</label>
-            <select class="form-select" id="complaintShakha">
-                <option value="">शाखा छान्नुहोस् (अनिवार्य छैन)</option>
-                ${Object.values(SHAKHA).map(v => `<option value="${v}">${v}</option>`).join('')}
+          <!-- सम्बन्धित शाखा (admin only) -->
+          <div class="form-group nvc-fg">
+            <label class="form-label nvc-label"><i class="fas fa-sitemap" style="color:#0284c7;"></i> सम्बन्धित शाखा</label>
+            <select class="form-select nvc-select" id="complaintShakha">
+              <option value="">शाखा छान्नुहोस्</option>
+              ${Object.values(SHAKHA).map(v => `<option value="${v}">${v}</option>`).join('')}
             </select>
-            <div id="aiShakhaSuggestion" class="mt-2 hidden"></div>
+            <div id="aiShakhaSuggestion" class="mt-1 hidden"></div>
           </div>` : ''}
-          
-          <div class="location-section mb-3" style="grid-column: span 2;">
-            <h6 class="mb-2">📍 स्थान जानकारी</h6>
-            <div class="d-grid gap-2" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));">
-              <div class="form-group">
-                <label class="form-label">प्रदेश</label>
-                <select class="form-select" id="complaintProvince" onchange="loadDistricts()">
-                  <option value="">प्रदेश छान्नुहोस्</option>
-                  ${Object.entries(LOCATION_FIELDS.PROVINCE).map(([key, value]) =>
+
+        </div>
+
+        <!-- ══ Section 2: स्थान जानकारी ══ -->
+        <div class="nvc-section-divider" style="display:flex;align-items:center;gap:8px;margin:0 0 10px;">
+          <span style="background:#f0fdf4;color:var(--primary, #133f81);padding:2px 10px;border-radius:20px;font-size:0.75rem;font-weight:600;white-space:nowrap;">
+            <i class="fas fa-map-location-dot" style="color:var(--primary, #133f81);"></i> स्थान जानकारी
+          </span>
+          <hr style="flex:1;border:none;border-top:1px dashed #e2e8f0;margin:0;">
+        </div>
+
+        <div class="nvc-form-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px 14px;margin-bottom:14px;">
+          <div class="form-group nvc-fg">
+            <label class="form-label nvc-label"><i class="fas fa-map" style="color:var(--primary, #133f81);"></i> प्रदेश</label>
+            <select class="form-select nvc-select" id="complaintProvince" onchange="loadDistricts()">
+              <option value="">प्रदेश छान्नुहोस्</option>
+              ${Object.entries(LOCATION_FIELDS.PROVINCE).map(([key, value]) =>
     `<option value="${key}">${value}</option>`
   ).join('')}
-                </select>
-              </div>
-              <div class="form-group">
-                <label class="form-label">जिल्ला</label>
-                <select class="form-select" id="complaintDistrict" disabled onchange="loadComplaintLocals()">
-                  <option value="">पहिला प्रदेश छान्नुहोस्</option>
-                </select>
-              </div>
-              <div class="form-group">
-                <label class="form-label">स्थानीय तह / नगर</label>
-                <select class="form-select" id="complaintLocal" disabled>
-                  <option value="">पहिला जिल्ला छान्नुहोस्</option>
-                </select>
-              </div>
+            </select>
+          </div>
+          <div class="form-group nvc-fg">
+            <label class="form-label nvc-label"><i class="fas fa-location-dot" style="color:var(--primary, #133f81);"></i> जिल्ला</label>
+            <select class="form-select nvc-select" id="complaintDistrict" disabled onchange="loadComplaintLocals()">
+              <option value="">पहिला प्रदेश छान्नुहोस्</option>
+            </select>
+          </div>
+          <div class="form-group nvc-fg">
+            <label class="form-label nvc-label"><i class="fas fa-city" style="color:var(--primary, #133f81);"></i> स्थानीय तह </label>
+            <select class="form-select nvc-select" id="complaintLocal" disabled>
+              <option value="">पहिला जिल्ला छान्नुहोस्</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- ══ Section 3: उजुरी विवरण ══ -->
+        <div class="nvc-section-divider" style="display:flex;align-items:center;gap:8px;margin:0 0 10px;">
+          <span style="background:#fff7ed;color:var(--primary, #133f81);padding:2px 10px;border-radius:20px;font-size:0.75rem;font-weight:600;white-space:nowrap;">
+            <i class="fas fa-file-lines" style="color:var(--primary, #133f81);"></i> उजुरी विवरण
+          </span>
+          <hr style="flex:1;border:none;border-top:1px dashed #e2e8f0;margin:0;">
+        </div>
+
+        <div style="margin-bottom:14px;">
+          <div class="form-group nvc-fg" style="margin-bottom:6px;">
+            <div class="d-flex align-center justify-between" style="margin-bottom:4px;">
+              <label class="form-label nvc-label mb-0"><i class="fas fa-pen-nib" style="color:var(--primary, #133f81);"></i> उजुरीको विवरण <span class="req">*</span></label>
+              <button type="button" id="descVoiceBtn" class="btn btn-sm btn-outline-primary" title="आवाजले लेख्नुहोस् (नेपाली)" style="padding:2px 8px;font-size:0.72rem;"><i class="fas fa-microphone"></i> आवाज</button>
+            </div>
+            <textarea class="form-control nvc-input" rows="3" id="complaintDescription" placeholder="उजुरीको संक्षिप्त विवरण लेख्नुहोस्..." maxlength="500" style="resize:vertical;"></textarea>
+            <div class="d-flex justify-between mt-1">
+              <div class="text-xs text-muted" id="descCount">०/५०० अक्षर</div>
+              <div id="descQuality" class="text-xs"></div>
             </div>
           </div>
 
-          <div class="form-group" style="grid-column: span 2;">
-            <label class="form-label">उजुरीको विवरण *</label>
-            <textarea class="form-control" rows="3" id="complaintDescription" placeholder="उजुरीको संक्षिप्त विवरण" maxlength="500"></textarea>
-            <div class="mt-2 d-flex justify-content-end">
-                <button type="button" id="descVoiceBtn" class="btn btn-sm btn-outline-primary" title="आवाजले लेख्नुहोस् (नेपाली)"><i class="fas fa-microphone"></i> आवाज टाइप</button>
-            </div>
-            <div class="d-flex justify-between mt-1">
-                <div class="text-xs text-muted" id="descCount">०/५०० अक्षर</div>
-                <div id="descQuality" class="text-xs"></div>
-            </div>
-          </div>
-          
           <!-- AI Analysis Section -->
-          <div class="form-group" style="grid-column: span 2;" id="aiSuggestionBox">
-            <div class="ai-analysis-box hidden" id="aiSuggestionContent">
-                <div class="mb-2 border-bottom pb-2">
-                    <i class="fas fa-robot"></i> <strong>AI विश्लेषण</strong>
+          <div id="aiSuggestionBox">
+            <div class="ai-analysis-box hidden" id="aiSuggestionContent" style="margin-top:6px;">
+              <div class="mb-2 border-bottom pb-2"><i class="fas fa-robot"></i> <strong>AI विश्लेषण</strong></div>
+              <div class="row g-2">
+                <div class="col-md-6">
+                  <div id="aiCategoryText" class="mb-1"></div>
+                  <div id="aiPriorityText" class="mb-1"></div>
                 </div>
-                <div class="row g-2">
-                    <div class="col-md-6">
-                        <div id="aiCategoryText" class="mb-1"></div>
-                        <div id="aiPriorityText" class="mb-1"></div>
-                    </div>
-                    <div class="col-md-6">
-                         <div id="aiDecisionSuggestion" class="text-small text-muted fst-italic"></div>
-                    </div>
-                </div>
+                <div class="col-md-6"><div id="aiDecisionSuggestion" class="text-small text-muted fst-italic"></div></div>
+              </div>
             </div>
             <div id="similarComplaintsBox" class="mt-2 hidden">
-                <div class="alert alert-warning p-2">
-                    <h6 class="alert-heading text-small mb-1"><i class="fas fa-copy"></i> सम्भावित उस्तै उजुरीहरू</h6>
-                    <ul class="mb-0 ps-3 text-small" id="similarComplaintsList"></ul>
-                </div>
+              <div class="alert alert-warning p-2">
+                <h6 class="alert-heading text-small mb-2"><i class="fas fa-copy"></i> सम्भावित उस्तै उजुरीहरू</h6>
+                <div id="similarComplaintsList"></div>
+              </div>
             </div>
-          </div>          
-          
-          <div class="form-group" style="grid-column: span 2;">
-            <label class="form-label">समितिको निर्णय</label>
-            <textarea class="form-control" rows="3" id="committeeDecision" placeholder="समितिको निर्णय" maxlength="500"></textarea>
-            <div class="mt-2 d-flex justify-content-end">
-                <button type="button" id="committeeVoiceBtn" class="btn btn-sm btn-outline-primary" title="आवाजले लेख्नुहोस् (नेपाली)"><i class="fas fa-microphone"></i> आवाज टाइप</button>
-            </div>
-            <div class="text-xs text-muted mt-1" id="committeeDecisionCount">०/५०० अक्षर</div>
           </div>
-          <div class="form-group"><label class="form-label">कैफियत</label><input type="text" class="form-control" id="complaintRemarks" placeholder="कैफियत" /></div>
-          <div class="form-group"><label class="form-label">स्थिति *</label><select class="form-select" id="complaintStatus"><option value="pending">काम बाँकी</option><option value="progress">चालु</option><option value="resolved">फछ्रयौट</option></select></div>
         </div>
-        <div class="mt-4 d-flex justify-end gap-2">
-          <button class="btn btn-outline" onclick="showComplaintsView()">रद्द गर्नुहोस्</button>
-          <button class="btn btn-primary" onclick="saveNewComplaint()">सुरक्षित गर्नुहोस्</button>
+
+        <!-- ══ Section 4: समितिको निर्णय ══ -->
+        <div class="nvc-section-divider" style="display:flex;align-items:center;gap:8px;margin:0 0 10px;">
+          <span style="background:#faf5ff;color:var(--primary, #133f81);padding:2px 10px;border-radius:20px;font-size:0.75rem;font-weight:600;white-space:nowrap;">
+            <i class="fas fa-gavel" style="color:var(--primary, #133f81);"></i> समितिको निर्णय
+          </span>
+          <hr style="flex:1;border:none;border-top:1px dashed #e2e8f0;margin:0;">
         </div>
-      </div>
-    </div>
+
+        <div class="form-group nvc-fg" style="margin-bottom:6px;">
+          <div class="d-flex align-center justify-between" style="margin-bottom:4px;">
+            <label class="form-label nvc-label mb-0"><i class="fas fa-stamp" style="color:var(--primary, #133f81);"></i> निर्णय विवरण</label>
+            <button type="button" id="committeeVoiceBtn" class="btn btn-sm btn-outline-primary" title="आवाजले लेख्नुहोस् (नेपाली)" style="padding:2px 8px;font-size:0.72rem;"><i class="fas fa-microphone"></i> आवाज</button>
+          </div>
+          <textarea class="form-control nvc-input" rows="2" id="committeeDecision" placeholder="उजुरी व्यवस्थापन समितिको निर्णय" maxlength="500" style="resize:vertical;"></textarea>
+          <div class="text-xs text-muted mt-1" id="committeeDecisionCount">०/५०० अक्षर</div>
+        </div>
+
+        <!-- स्थिति र कैफियत - समितिको निर्णय पछि -->
+        <div class="nvc-form-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px 14px;margin-top:10px;margin-bottom:6px;">
+          <!-- स्थिति -->
+          <div class="form-group nvc-fg">
+            <label class="form-label nvc-label"><i class="fas fa-traffic-light" style="color:var(--primary, #133f81);"></i> स्थिति <span class="req">*</span></label>
+            <select class="form-select nvc-select" id="complaintStatus">
+              <option value="pending">⏳ काम बाँकी</option>
+              <option value="progress">🔄 चालु</option>
+              <option value="resolved">✅ फछ्रयौट</option>
+            </select>
+          </div>
+          <!-- कैफियत -->
+          <div class="form-group nvc-fg">
+            <label class="form-label nvc-label"><i class="fas fa-note-sticky" style="color:var(--primary, #133f81);"></i> कैफियत</label>
+            <input type="text" class="form-control nvc-input" id="complaintRemarks" placeholder="कैफियत" autocomplete="off" />
+          </div>
+        </div>
+
+        <!-- ══ Action Footer ══ -->
+        <div style="display:flex;justify-content:flex-end;gap:10px;padding-top:12px;margin-top:10px;border-top:1px solid #e2e8f0;">
+          <button class="btn btn-outline" onclick="showComplaintsView()" style="padding:7px 18px;font-size:0.9rem;">
+            <i class="fas fa-xmark"></i> रद्द गर्नुहोस्
+          </button>
+          <button class="btn btn-primary" onclick="saveNewComplaint()" style="padding:7px 22px;font-size:0.9rem;">
+            <i class="fas fa-floppy-disk"></i> सुरक्षित गर्नुहोस्
+          </button>
+        </div>
+
+      </div><!-- /.card-body -->
+    </div><!-- /.card -->
+
+    <style>
+      .nvc-entry-card { border-radius: 10px; overflow: hidden; }
+      .nvc-entry-header { background: linear-gradient(90deg, #f8faff 0%, #f0f4ff 100%); border-bottom: 2px solid #e8ecf8; }
+      .nvc-label { font-size: 0.82rem; font-weight: 600; color: #374151; margin-bottom: 4px; display: flex; align-items: center; gap: 5px; }
+      .nvc-label .req { color: #dc2626; }
+      .nvc-input, .nvc-select {
+        font-size: 0.88rem !important;
+        padding: 6px 10px !important;
+        border-radius: 7px !important;
+        border: 1px solid #d1d5db !important;
+        transition: border-color 0.2s, box-shadow 0.2s;
+      }
+      .nvc-input:focus, .nvc-select:focus {
+        border-color: #6366f1 !important;
+        box-shadow: 0 0 0 3px rgba(99,102,241,0.12) !important;
+        outline: none !important;
+      }
+      .nvc-fg { margin-bottom: 0; }
+      .nvc-section-divider span { letter-spacing: 0.02em; }
+      @media (max-width: 600px) {
+        .nvc-form-grid { grid-template-columns: 1fr !important; }
+      }
+    </style>
   `;
 
   document.getElementById('contentArea').innerHTML = content;
@@ -12290,8 +12684,61 @@ function showNewComplaintView() {
         const val = dateInput.value;
         const cur = getCurrentNepaliDate();
         const warning = document.getElementById('dateWarning');
-        if (val && cur && val > cur) {
-          warning.classList.remove('hidden');
+
+        // Debug logging to identify the issue
+        console.log('Date comparison:', {
+          selected: val,
+          current: cur,
+          comparison: val > cur,
+          valType: typeof val,
+          curType: typeof cur
+        });
+
+        // Ensure both dates are in YYYY-MM-DD format for proper comparison
+        if (val && cur) {
+          // Normalize dates by converting Devanagari digits to Latin if needed
+          const normalizedVal = typeof _devnagariToLatin === 'function' ? _devnagariToLatin(val) : val;
+          const normalizedCur = typeof _devnagariToLatin === 'function' ? _devnagariToLatin(cur) : cur;
+
+          // Only compare if both are valid date strings
+          const valParts = normalizedVal.split('-');
+          const curParts = normalizedCur.split('-');
+
+          if (valParts.length === 3 && curParts.length === 3) {
+            const valYear = parseInt(valParts[0], 10);
+            const valMonth = parseInt(valParts[1], 10);
+            const valDay = parseInt(valParts[2], 10);
+
+            const curYear = parseInt(curParts[0], 10);
+            const curMonth = parseInt(curParts[1], 10);
+            const curDay = parseInt(curParts[2], 10);
+
+            // Compare year, then month, then day
+            const isFuture = (
+              valYear > curYear ||
+              (valYear === curYear && valMonth > curMonth) ||
+              (valYear === curYear && valMonth === curMonth && valDay > curDay)
+            );
+
+            console.log('Detailed comparison:', {
+              valYear, valMonth, valDay,
+              curYear, curMonth, curDay,
+              isFuture
+            });
+
+            if (isFuture) {
+              warning.classList.remove('hidden');
+            } else {
+              warning.classList.add('hidden');
+            }
+          } else {
+            // Fallback to string comparison if format is unexpected
+            if (normalizedVal > normalizedCur) {
+              warning.classList.remove('hidden');
+            } else {
+              warning.classList.add('hidden');
+            }
+          }
         } else {
           warning.classList.add('hidden');
         }
@@ -12349,32 +12796,121 @@ function showNewComplaintView() {
                     `;
           }
 
-          // 3. Similar Complaints
+          // 3. Similar Complaints - Enhanced Detection
           const similarBox = document.getElementById('similarComplaintsBox');
           const similarList = document.getElementById('similarComplaintsList');
 
-          // Simple keyword extraction (remove common words)
-          const keywords = text.split(/\s+/).filter(w => w.length > 3).slice(0, 5);
-          if (keywords.length > 0) {
-            const similar = state.complaints.filter(c => {
-              if (!c.description) return false;
-              let matchCount = 0;
-              keywords.forEach(k => {
-                if (c.description.includes(k)) matchCount++;
-              });
-              // Relaxed logic: if we have few keywords, 1 match is enough.
-              return matchCount >= (keywords.length < 3 ? 1 : 2);
-            }).slice(0, 3);
+          if (text && text.trim().length > 10) {
+            const currentId = document.getElementById('complaintId')?.value;
+            const complainantInput = document.getElementById('complainantName')?.value || '';
+            const accusedInput = document.getElementById('accusedName')?.value || '';
 
-            if (similar.length > 0) {
-              similarBox.classList.remove('hidden');
-              similarList.innerHTML = similar.map(c => `
-                            <li>
-                              <a href="#" class="text-dark text-decoration-none action-btn" data-action="view" data-id="${c.id}">
-                                <strong>${c.id}</strong>: ${c.description.substring(0, 40)}...
-                              </a>
-                            </li>
-                        `).join('');
+            // Enhanced keyword extraction with normalization
+            const normalizeText = (txt) => {
+              if (!txt) return '';
+              return String(txt).toLowerCase()
+                .replace(/[०-९]/g, d => "0123456789"["०१२३४५६७८९".indexOf(d)]) // Normalize to Latin digits
+                .replace(/[.,;:!?()'"[\]{}]/g, ' ') // Replace punctuation with space
+                .replace(/\s+/g, ' ') // Normalize spaces
+                .trim();
+            };
+
+            const normalizedText = normalizeText(text);
+            const normalizedComplainant = normalizeText(complainantInput);
+            const normalizedAccused = normalizeText(accusedInput);
+
+            // Extract meaningful keywords (remove common Nepali words)
+            const stopWords = ['छ', 'हो', 'छु', 'गर्नु', 'गरेको', 'गरिएको', 'गर्ने', 'छुट्टै', 'यो', 'त्यो', 'यी', 'ती', 'उनी', 'उनीहरू', 'म', 'हामी', 'तिमी', 'तपाईं', 'यहाँ', 'त्यहाँ', 'कहिल्यै', 'अहिले', 'पछि', 'अघि', 'भित्र', 'बाहिर', 'माथि', 'तल', 'जस्तै', 'जस्तो', 'भन्नु', 'भन्ने', 'थियो', 'थिएन', 'छैन', 'छन्', 'रहेको', 'रहेका', 'लागि', 'बाट', 'भएको', 'तथा', 'पनि', 'सबै', 'भने', 'गर्दा', 'अनुसार'];
+
+            const keywords = normalizedText
+              .split(/\s+/)
+              .filter(w => w.length > 2 && !stopWords.includes(w))
+              .slice(0, 15); // Increased keyword pool
+
+            if (keywords.length > 0 || normalizedComplainant || normalizedAccused) {
+              const similar = state.complaints
+                .map(c => {
+                  if (!c.description || String(c.id) === String(currentId)) return null;
+
+                  const cDesc = normalizeText(c.description);
+                  const cComplainant = normalizeText(c.complainant);
+                  const cAccused = normalizeText(c.accused);
+
+                  let matchCount = 0;
+                  let similarityScore = 0;
+
+                  // 1. Description keyword matching (60% weight)
+                  keywords.forEach(kw => {
+                    if (cDesc.includes(kw)) matchCount++;
+                  });
+                  similarityScore += (matchCount / (keywords.length || 1)) * 0.6;
+
+                  // 2. Name matching for Complainant/Accused (High signal)
+                  if (normalizedComplainant && cComplainant) {
+                    if (normalizedComplainant === cComplainant) similarityScore += 0.4;
+                    else if (normalizedComplainant.includes(cComplainant) || cComplainant.includes(normalizedComplainant)) similarityScore += 0.2;
+                  }
+                  if (normalizedAccused && cAccused) {
+                    if (normalizedAccused === cAccused) similarityScore += 0.4;
+                    else if (normalizedAccused.includes(cAccused) || cAccused.includes(normalizedAccused)) similarityScore += 0.2;
+                  }
+
+                  // Additional similarity scoring based on text length ratio
+                  const lengthRatio = Math.min(normalizedText.length, cDesc.length) /
+                    Math.max(normalizedText.length, cDesc.length);
+                  similarityScore += lengthRatio * 0.05;
+
+                  return {
+                    complaint: c,
+                    score: similarityScore
+                  };
+                })
+                .filter(item => item && item.score > 0.22) // More robust threshold
+                .sort((a, b) => b.score - a.score)
+                .slice(0, 5); // Show top 5
+
+              if (similar.length > 0) {
+                // शब्दहरू हाइलाइट गर्ने हेल्पर फङ्सन
+                const highlightText = (txt, kws) => {
+                  if (!txt || !kws || kws.length === 0) return txt || '';
+                  const validKws = [];
+                  kws.forEach(k => {
+                    if (k.length <= 2) return;
+                    validKws.push(k);
+                    // यदि अंक छ भने देवनागरी संस्करण पनि थप्ने (मिल्दो हाइलाइटको लागि)
+                    if (/\d/.test(k)) validKws.push(k.replace(/\d/g, d => "०१२३४५६७८९"[d]));
+                  });
+                  if (validKws.length === 0) return txt;
+                  const escapedKws = validKws.map(k => k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|');
+                  const regex = new RegExp(`(${escapedKws})`, 'gi');
+                  return String(txt).replace(regex, '<mark class="highlight-keyword">$1</mark>');
+                };
+
+                similarBox.classList.remove('hidden');
+                similarList.innerHTML = similar.map(item => {
+                  const c = item.complaint;
+                  const matchPercent = Math.min(100, Math.max(0, Math.round(item.score * 100)));
+                  const highlightedDesc = highlightText(c.description, keywords);
+
+                  return `
+                  <div class="similar-complaint-card">
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <div class="d-flex align-items-center gap-2">
+                          <strong class="text-primary" style="font-size: 0.8rem;">#${_latinToDevnagari(c.id)}</strong>
+                          <span class="similarity-score" style="padding: 1px 5px; font-size: 0.7rem;"><i class="fas fa-check-circle me-1"></i>${_latinToDevnagari(matchPercent)}%</span>
+                        </div>
+                        <button class="btn btn-xs btn-outline-primary py-0 px-2 action-btn" data-action="view" data-id="${c.id}" style="font-size: 0.7rem;" title="हेर्नुहोस्"><i class="fas fa-eye"></i></button>
+                    </div>
+                    <div class="text-dark mb-1" style="font-size: 0.8rem; line-height:1.3; display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden;">${highlightedDesc}</div>
+                    <div class="d-flex justify-content-between text-muted" style="font-size: 0.75rem;">
+                      <span class="text-truncate" style="max-width: 60%;" title="उजुरकर्ता"><i class="fas fa-user me-1"></i>${c.complainant || '-'}</span>
+                      <span title="दर्ता मिति"><i class="fas fa-calendar-alt me-1"></i>${c.date || '-'}</span>
+                    </div>
+                  </div>
+                `}).join('');
+              } else {
+                similarBox.classList.add('hidden');
+              }
             } else {
               similarBox.classList.add('hidden');
             }
@@ -14698,7 +15234,7 @@ function showShakhaReportsView() {
           <table class="table">
             <thead><tr><th>शाखा</th><th>कूल उजुरी</th><th>काम बाँकी</th><th>चालु</th><th>फछ्रयौट</th><th>फछ्रयौट दर</th><th>कार्य</th></tr></thead>
             <tbody>
-              ${Object.keys(shakhaStats).map(shakha => {
+              ${Object.keys(shakhaStats).filter(shakha => shakha !== 'अन्य').map(shakha => {
     const stats = shakhaStats[shakha];
     const shakhaName = getShakhaName(shakha);
     const resolutionRate = stats.total > 0 ? Math.round((stats.resolved / stats.total) * 100) : 0;
@@ -14723,7 +15259,7 @@ function showShakhaReportsView() {
     if (typeof Chart !== 'undefined') {
       const ctx = document.getElementById('shakhaComparisonChart');
       if (ctx) {
-        const shakhas = Object.keys(shakhaStats);
+        const shakhas = Object.keys(shakhaStats).filter(shakha => shakha !== 'अन्य');
         const pendingData = shakhas.map(shakha => shakhaStats[shakha].pending);
         const resolvedData = shakhas.map(shakha => shakhaStats[shakha].resolved);
 
@@ -14919,7 +15455,7 @@ function showSystemReportsView() {
           if (complaint.status === 'resolved') shakhaStats[shakha].resolved++;
         });
 
-        const shakhas = Object.keys(shakhaStats);
+        const shakhas = Object.keys(shakhaStats).filter(shakha => shakha !== 'अन्य');
         const rates = shakhas.map(shakha => {
           const stats = shakhaStats[shakha];
           return stats.total > 0 ? Math.round((stats.resolved / stats.total) * 100) : 0;
@@ -16455,6 +16991,14 @@ function editComplaint(id) {
   }
   if (!complaint) return;
 
+  const cProvince = complaint.province || complaint['प्रदेश'] || '';
+  const cDistrict = complaint.district || complaint['जिल्ला'] || '';
+  const cLocalLevel = complaint.location || complaint.localLevel || complaint['स्थानीय तह'] || '';
+
+  const isProvMatch = (k, v) => cProvince === k || cProvince === v || (normalizeProvinceName && normalizeProvinceName(cProvince) === normalizeProvinceName(v));
+  const provEntry = Object.entries(LOCATION_FIELDS.PROVINCE).find(([k, v]) => isProvMatch(k, v));
+  const provKey = provEntry ? provEntry[0] : '';
+
   const formContent = `
     <div class="d-grid gap-3" style="grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));">
       <div class="form-group"><label class="form-label">दर्ता नं</label><input type="text" class="form-control" value="${complaint.id}" readonly /></div>
@@ -16480,17 +17024,17 @@ function editComplaint(id) {
       <div class="form-group"><label class="form-label">प्रदेश</label>
         <select class="form-select" id="editProvince" onchange="loadEditDistricts()">
           <option value="">प्रदेश छन्नुहोस्</option>
-          ${Object.entries(LOCATION_FIELDS.PROVINCE).map(([key, value]) => `<option value="${key}" ${(complaint.province === key || complaint.province === value) ? 'selected' : ''}>${value}</option>`).join('')}
+          ${Object.entries(LOCATION_FIELDS.PROVINCE).map(([key, value]) => `<option value="${key}" ${isProvMatch(key, value) ? 'selected' : ''}>${value}</option>`).join('')}
         </select>
       </div>
       <div class="form-group"><label class="form-label">जिल्ला</label>
-        <select class="form-select" id="editDistrict" ${!complaint.province ? 'disabled' : ''} onchange="loadEditLocals()">
+        <select class="form-select" id="editDistrict" data-selected="${cDistrict}" ${!provKey ? 'disabled' : ''} onchange="loadEditLocals()">
           <option value="">जिल्ला छन्नुहोस्</option>
-          ${(() => { const pk = Object.entries(LOCATION_FIELDS.PROVINCE).find(([k, v]) => complaint.province === k || complaint.province === v); return pk && LOCATION_FIELDS.DISTRICTS[pk[0]] ? LOCATION_FIELDS.DISTRICTS[pk[0]].map(dist => `<option value="${dist}" ${complaint.district === dist ? 'selected' : ''}>${dist}</option>`).join('') : ''; })()}
+          ${provKey && LOCATION_FIELDS.DISTRICTS[provKey] ? LOCATION_FIELDS.DISTRICTS[provKey].map(dist => `<option value="${dist}" ${cDistrict === dist ? 'selected' : ''}>${dist}</option>`).join('') : ''}
         </select>
       </div>
       <div class="form-group"><label class="form-label">स्थानीय तह</label>
-        <select class="form-select" id="editLocalLevel" data-selected="${complaint.localLevel || ''}">
+        <select class="form-select" id="editLocalLevel" data-selected="${cLocalLevel}">
           <option value="">पहिला जिल्ला छान्नुहोस्</option>
         </select>
       </div>
@@ -16520,7 +17064,7 @@ function editComplaint(id) {
       <div class="form-group"><label class="form-label">कैफियत</label><input type="text" class="form-control" value="${complaint.remarks || ''}" id="editRemarks" /></div>
       <div class="form-group"><label class="form-label">स्थिति</label><select class="form-select" id="editStatus"><option value="pending" ${complaint.status === 'pending' ? 'selected' : ''}>काम बाँकी</option><option value="progress" ${complaint.status === 'progress' ? 'selected' : ''}>चालु</option><option value="resolved" ${complaint.status === 'resolved' ? 'selected' : ''}>फछ्रयौट</option></select></div>
       
-      <div class="form-group"><label class="form-label">अन्तिम निर्णयको प्रकार</label><select class="form-select" id="editFinalDecision"><option value="">छान्नुहोस्</option>${['तामेली', 'सुझाव/निर्देशन', 'सतर्क', 'अन्य'].map(label => `<option value="${label}" ${normalizeFinalDecisionType(complaint.finalDecision) === label ? 'selected' : ''}>${label}</option>`).join('')}</select></div>
+      <div class="form-group"><label class="form-label">अन्तिम निर्णयको प्रकार</label><select class="form-select" id="editFinalDecision"><option value="">छान्नुहोस्</option>${['तामेली', 'सुझाव/निर्देशन', 'सतर्क', 'छानविन तथा कारबाही गरी जानकारी दिन लेखी पठाउने', 'अ. दु. अ.आ. मा लेखि पठाउने', 'छानविन तथा कारबाहीका लागि अन्य निकायमा पठाउने', 'अन्य'].map(label => `<option value="${label}" ${normalizeFinalDecisionType(complaint.finalDecision) === label ? 'selected' : ''}>${label}</option>`).join('')}</select></div>
 
     </div>
     <div class="modal-footer"><button class="btn btn-outline" onclick="closeModal()">रद्द गर्नुहोस्</button><button class="btn btn-primary" onclick="saveEditedComplaint('${id}')">सुरक्षित गर्नुहोस्</button></div>
@@ -16560,15 +17104,151 @@ function saveComplaint(id) {
   showComplaintsView();
 }
 
+function showPasswordConfirmationDialog(callback) {
+  const content = `
+    <div class="form-group">
+      <label class="form-label">के तपाईं यो उजुरी हटाउन चाहनुहुन्छ?</label>
+      <p class="text-muted">Google Sheets मा हटाउनका लागि तपाईंको पासवर्ड पुष्टि गर्नुहोस्।</p>
+    </div>
+    <div class="form-group">
+      <label class="form-label">पासवर्ड *</label>
+      <input type="password" class="form-control" id="deletePasswordInput" placeholder="आफ्नो पासवर्ड प्रविष्ट गर्नुहोस्" autocomplete="current-password">
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal()">रद्द गर्नुहोस्</button>
+      <button class="btn btn-danger" onclick="confirmDeleteWithPassword()">हटाउनुहोस्</button>
+    </div>
+  `;
+
+  openModal('पासवर्ड पुष्टि', content);
+
+  // Store callback globally for access from confirmDeleteWithPassword
+  window._deleteCallback = callback;
+
+  // Focus on password input
+  setTimeout(() => {
+    const passwordInput = document.getElementById('deletePasswordInput');
+    if (passwordInput) {
+      passwordInput.focus();
+    }
+  }, 100);
+}
+
+function confirmDeleteWithPassword() {
+  const password = document.getElementById('deletePasswordInput').value;
+
+  if (!password) {
+    showToast('कृपया पासवर्ड प्रविष्ट गर्नुहोस्', 'warning');
+    return;
+  }
+
+  // Verify password against current user
+  const currentUser = state.currentUser;
+  if (!currentUser) {
+    showToast('प्रयोगकर्ता फेला परेन', 'error');
+    closeModal();
+    return;
+  }
+
+  console.log('Password verification debug:');
+  console.log('Current user:', currentUser);
+  console.log('Current user username:', currentUser.username);
+  console.log('Current user name:', currentUser.name);
+  console.log('Current user id:', currentUser.id);
+  console.log('Current user code:', currentUser.code);
+  console.log('Entered password length:', password.length);
+  console.log('Google Sheets enabled:', GOOGLE_SHEETS_CONFIG.ENABLED);
+  console.log('State users available:', state.users && state.users.length > 0);
+
+  let isPasswordValid = false;
+
+  // Check against Google Sheets users if available
+  if (GOOGLE_SHEETS_CONFIG.ENABLED && state.users && state.users.length > 0) {
+    console.log('Checking Google Sheets users...');
+    console.log('Available users:', state.users.map(u => ({ username: u.username, code: u.code })));
+
+    const userFromSheets = state.users.find(u =>
+      (u.username && currentUser.name && u.username.toLowerCase() === currentUser.name.toLowerCase()) ||
+      (u.code && currentUser.name && u.code.toLowerCase() === currentUser.name.toLowerCase()) ||
+      (u.username && currentUser.username && u.username.toLowerCase() === currentUser.username.toLowerCase()) ||
+      (u.code && currentUser.username && u.code.toLowerCase() === currentUser.username.toLowerCase())
+    );
+
+    console.log('Found user from sheets:', userFromSheets ? { username: userFromSheets.username, code: userFromSheets.code, password: userFromSheets.password, passwordLength: userFromSheets.password ? userFromSheets.password.length : 'undefined' } : null);
+    console.log('Password comparison:', { enteredPassword: password, enteredLength: password.length, storedPassword: userFromSheets ? userFromSheets.password : 'no user', storedLength: userFromSheets && userFromSheets.password ? userFromSheets.password.length : 'undefined' });
+
+    if (userFromSheets && userFromSheets.password === password) {
+      console.log('Google Sheets password match successful');
+      isPasswordValid = true;
+    } else {
+      console.log('Google Sheets password mismatch or user not found');
+    }
+  }
+
+  // Check against hardcoded users as fallback
+  if (!isPasswordValid) {
+    console.log('Checking hardcoded users...');
+    console.log('Calling findUserByCredentials with:', { username: currentUser.name || currentUser.username, password: password });
+
+    // Test the function directly
+    const testUser = findUserByCredentials('suchana', 'suchana');
+    console.log('Direct test findUserByCredentials("suchana", "suchana"):', testUser ? { username: testUser.username, password: testUser.password } : null);
+
+    const hardcodedUser = findUserByCredentials(currentUser.name || currentUser.username, password);
+    console.log('Found hardcoded user:', hardcodedUser ? { username: hardcodedUser.username, role: hardcodedUser.role } : null);
+
+    if (hardcodedUser) {
+      console.log('Hardcoded password match successful');
+      isPasswordValid = true;
+    } else {
+      console.log('Hardcoded password mismatch or user not found');
+    }
+  }
+
+  console.log('Final password validation result:', isPasswordValid);
+
+  if (!isPasswordValid) {
+    showToast('गलत पासवर्ड', 'error');
+    return;
+  }
+
+  // Password is valid, execute the callback
+  if (typeof window._deleteCallback === 'function') {
+    window._deleteCallback();
+  }
+
+  closeModal();
+}
+
 function _deleteComplaint(id) {
   if (confirm('के तपाईं यो उजुरी हटाउन चाहनुहुन्छ?')) {
-    const index = state.complaints.findIndex(c => c.id === id);
-    if (index !== -1) {
-      state.complaints.splice(index, 1);
-      backupToLocalStorage();
-      showToast('उजुरी हटाइयो', 'success');
-      showComplaintsView();
-    }
+    showPasswordConfirmationDialog(() => {
+      const index = state.complaints.findIndex(c => c.id === id);
+      if (index !== -1) {
+        const complaint = state.complaints[index];
+        state.complaints.splice(index, 1);
+        backupToLocalStorage();
+
+        // Delete from Google Sheets
+        if (GOOGLE_SHEETS_CONFIG.ENABLED) {
+          postToGoogleSheets('deleteComplaint', {
+            id: id,
+            deletedBy: state.currentUser?.name
+          }).then(response => {
+            if (response && response.success) {
+              console.log('Complaint deleted from Google Sheets:', id);
+            } else {
+              console.warn('Failed to delete complaint from Google Sheets:', response);
+            }
+          }).catch(error => {
+            console.error('Error deleting complaint from Google Sheets:', error);
+          });
+        }
+
+        showToast('उजुरी हटाइयो', 'success');
+        showComplaintsView();
+      }
+    });
   }
 }
 
@@ -16672,7 +17352,7 @@ function clearComplaintsFilters() {
 
 // Delegated handler for complaints table actions (works for dynamically rendered buttons)
 function handleTableActions(e) {
-  const targetBtn = e.target.closest('button.action-btn');
+  const targetBtn = e.target.closest('button.action-btn, a.action-btn');
   if (!targetBtn) return;
 
   e.preventDefault();
@@ -17746,12 +18426,18 @@ function loadEditDistricts() {
   const districtSelect = document.getElementById('editDistrict');
   if (!provinceSelect || !districtSelect) return;
   const provinceId = provinceSelect.value;
+  
+  const currentVal = districtSelect.value;
+  const dataSelected = districtSelect.dataset && districtSelect.dataset.selected ? districtSelect.dataset.selected : districtSelect.getAttribute('data-selected');
+  const selVal = dataSelected || currentVal;
+  
   districtSelect.innerHTML = '<option value="">जिल्ला छन्नुहोस्</option>';
   if (provinceId && LOCATION_FIELDS.DISTRICTS[provinceId]) {
     LOCATION_FIELDS.DISTRICTS[provinceId].forEach(dist => {
       const option = document.createElement('option');
       option.value = dist;
       option.textContent = dist;
+      if (selVal === dist) option.selected = true;
       districtSelect.appendChild(option);
     });
     districtSelect.disabled = false;
@@ -18703,9 +19389,20 @@ function toggleFieldSpeech(fieldId, btnId) {
 
         const field = document.getElementById(fieldId);
         if (field) {
-          // Append final results without losing existing content
+          // Append new text only if it's different from last processed text
           if (finalTranscript && finalTranscript.trim().length > 0) {
-            field.value = (field.value ? field.value + ' ' : '') + finalTranscript.trim();
+            const trimmedTranscript = finalTranscript.trim();
+            
+            // Initialize lastTranscript if not exists
+            if (!state.lastTranscript) {
+              state.lastTranscript = '';
+            }
+            
+            // Only append if this is new text (different from last processed)
+            if (trimmedTranscript !== state.lastTranscript) {
+              field.value = (field.value ? field.value + ' ' : '') + trimmedTranscript;
+              state.lastTranscript = trimmedTranscript;
+            }
           }
         }
       } catch (e) { console.error('field speech result error', e); }
