@@ -205,6 +205,35 @@ const MINISTRIES = [
   "सुदूर पश्चिम प्रदेश"
 ];
 
+// नेपालको विद्यमान प्रमुख ऐन र नियमावलीहरूको सूची (Fallback र Knowledge Base को लागि)
+const LAWS_AND_REGULATIONS = [
+  {
+    name: "भ्रष्टाचार निवारण ऐन, २०५९",
+    keywords: ["भ्रष्टाचार", "घुस", "रिसवत", "हानी नोक्सानी", "गलत लिखत", "झुट्टा", "सम्पत्ति", "अवैध"],
+    description: "भ्रष्टाचारजन्य कार्यको परिभाषा र सजाय सम्बन्धी व्यवस्था।"
+  },
+  {
+    name: "सार्वजनिक खरिद ऐन, २०६३",
+    keywords: ["खरिद", "ठेक्का", "बोलपत्र", "टेण्डर", "लागत अनुमान", "स्पेसिफिकेशन", "परामर्श", "कालो सूची"],
+    description: "सार्वजनिक निकायले गर्ने खरिद प्रक्रियाको पारदर्शिता र मितव्ययिता सम्बन्धी।"
+  },
+  {
+    name: "निजामती सेवा ऐन, २०४९",
+    keywords: ["कर्मचारी", "आचरण", "विभागीय सजाय", "अनुशासन", "बिदा", "पदपूर्ति", "सरुवा", "बढुवा"],
+    description: "निजामती कर्मचारीको सेवा, सर्त र आचरण सम्बन्धी व्यवस्था।"
+  },
+  {
+    name: "स्थानीय सरकार सञ्चालन ऐन, २०७४",
+    keywords: ["स्थानीय तह", "गाउँपालिका", "नगरपालिका", "वडा", "योजना", "अनुगमन", "बजेट", "विकास निर्माण"],
+    description: "स्थानीय तहको अधिकार, काम, कर्तव्य र जिम्मेवारी सम्बन्धी।"
+  },
+  {
+    name: "सुशासन (व्यवस्थापन तथा सञ्चालन) ऐन, २०६४",
+    keywords: ["सुशासन", "जिम्मेवारी", "पारदर्शिता", "उत्तरदायित्व", "नागरिक बडापत्र", "समयपालन", "अनुगमन"],
+    description: "प्रशासनिक कार्यमा पारदर्शिता र उत्तरदायित्व सुनिश्चित गर्ने व्यवस्था।"
+  }
+];
+
 // AI System for complaint analysis
 const AI_SYSTEM = {
   // Structured keywords for better classification
@@ -218,9 +247,31 @@ const AI_SYSTEM = {
   },
 
   analyzeComplaint: function (description) {
+    if (!description) return { classification: 'अन्य', priority: 'न्यून', suggestedLaws: [] }; // Added suggestedLaws
+
     // Primary behaviour: use configured AI gateway (Gemini) asynchronously while returning
     // a fast local fallback so existing synchronous callers keep working.
-    if (!description) return { classification: 'अन्य', priority: 'न्यून' };
+
+    const lowerText = String(description || '').toLowerCase(); // For keyword matching
+
+    // --- Law Suggestion Logic (Local Rule-Based) ---
+    const suggestedLaws = [];
+    if (typeof LAWS_AND_REGULATIONS !== 'undefined' && Array.isArray(LAWS_AND_REGULATIONS)) {
+      LAWS_AND_REGULATIONS.forEach(law => {
+        let matchScore = 0;
+        law.keywords.forEach(keyword => {
+          if (lowerText.includes(keyword.toLowerCase())) {
+            matchScore++;
+          }
+        });
+        if (matchScore > 0) {
+          suggestedLaws.push({ name: law.name, score: matchScore, description: law.description });
+        }
+      });
+      // Sort by score and take top 3
+      suggestedLaws.sort((a, b) => b.score - a.score);
+    }
+    // --- End Law Suggestion Logic ---
 
     const text = String(description || '');
 
@@ -234,6 +285,8 @@ const AI_SYSTEM = {
         if (window.NVC && NVC.Api && typeof NVC.Api.analyzeWithGemini === 'function') {
           const res = await NVC.Api.analyzeWithGemini(text);
           if (res && res.success !== false) {
+            // Add suggested laws to the AI result
+            res.suggestedLaws = suggestedLaws.slice(0, 3); // Limit to top 3
             // Normalize store shape for quick access
             const normalized = (typeof res === 'object') ? res : { result: res };
             window._nvc_ai_cache[text] = normalized;
@@ -248,21 +301,37 @@ const AI_SYSTEM = {
           const lower = (desc || '').toLowerCase();
           let classification = 'अन्य';
           let priority = 'न्यून';
-          if (AI_SYSTEM.keywords.corruption.some(k => lower.includes(k))) { classification = 'भ्रष्टाचार'; priority = 'उच्च'; }
-          else if (AI_SYSTEM.keywords.procurement.some(k => lower.includes(k))) { classification = 'सार्वजनिक खरिद/ठेक्का'; priority = 'उच्च'; }
-          else if (AI_SYSTEM.keywords.infrastructure.some(k => lower.includes(k))) { classification = 'पूर्वाधार निर्माण'; priority = 'मध्यम'; }
-          else if (AI_SYSTEM.keywords.service.some(k => lower.includes(k))) { classification = 'सेवा प्रवाह'; priority = 'मध्यम'; }
-          else if (AI_SYSTEM.keywords.conduct.some(k => lower.includes(k))) { classification = 'कर्मचारी आचरण'; priority = 'मध्यम'; }
-          else if (AI_SYSTEM.keywords.policy.some(k => lower.includes(k))) { classification = 'नीति/निर्णय प्रक्रिया'; priority = 'न्यून'; }
-          return { classification, priority, source: 'fallback' };
+          let investigationProcedure = 'विवरण कागजात माग गरी छानबिन गर्ने।';
+          let committeeDecision = 'सम्बद्ध कागजात सहित राय प्रतिक्रिया पठाउन लेखी पठाउने पठाउने।';
+
+          let topLaw = suggestedLaws.length > 0 ? suggestedLaws[0].name : '';
+          let lawSuffix = topLaw ? ` (सम्बन्धित कानून: ${topLaw} बमोजिम)` : '';
+
+          if (AI_SYSTEM.keywords.corruption.some(k => lower.includes(k))) { classification = 'भ्रष्टाचार'; priority = 'उच्च'; investigationProcedure = 'छानबिन टोली गठन गर्ने।'; }
+          else if (AI_SYSTEM.keywords.procurement.some(k => lower.includes(k))) { classification = 'सार्वजनिक खरिद/ठेक्का'; priority = 'उच्च'; investigationProcedure = 'खरिद सम्बन्धी कागजात विवरण माग गर्ने।'; }
+          else if (AI_SYSTEM.keywords.infrastructure.some(k => lower.includes(k))) { classification = 'पूर्वाधार निर्माण'; priority = 'मध्यम'; investigationProcedure = 'प्राविधिक टोली खटाई स्थलगत अनुगमन/निरीक्षण गर्ने।'; }
+          else if (AI_SYSTEM.keywords.service.some(k => lower.includes(k))) { classification = 'सेवा प्रवाह'; priority = 'मध्यम'; investigationProcedure = 'सम्बन्धित कार्यालयसँग सम्बद्ध कागजात तथा राय/प्रतिक्रिया माग गर्ने।'; }
+          else if (AI_SYSTEM.keywords.conduct.some(k => lower.includes(k))) { classification = 'कर्मचारी आचरण'; priority = 'मध्यम'; investigationProcedure = 'सम्बन्धित कर्मचारीको राय प्रतिक्रिया माग गर्ने।'; }
+          else if (AI_SYSTEM.keywords.policy.some(k => lower.includes(k))) { classification = 'नीति/निर्णय प्रक्रिया'; priority = 'न्यून'; investigationProcedure = 'निर्णयको प्रतिलिपि र राय प्रतिक्रिया माग गर्ने।'; }
+
+          if (priority === 'उच्च') {
+            committeeDecision = 'उजुरी उपर छानविन गरी राय सहितको प्रतिवेदन पठाउन लेखी पठाउने।';
+          } else if (priority === 'मध्यम') {
+            committeeDecision = 'छानविन तथा कारबाही गरी केन्द्रलाई जानकारी पठाउन लेखी पठाउने।';
+          } else {
+            committeeDecision = 'आवश्यक छानविन तथा कारबाही गर्न लेखी पठाउने।';
+          }
+          committeeDecision += lawSuffix;
+
+          return { classification, priority, source: 'fallback', suggestedLaws: suggestedLaws.slice(0, 3), investigationProcedure, committeeDecision };
         })(text);
         window._nvc_ai_cache[text] = fallback;
         try { document.dispatchEvent(new CustomEvent('nvc.ai.analysis.updated', { detail: { text, result: fallback } })); } catch (e) { }
       } catch (e) { }
     })();
 
-    // Immediate return: conservative fallback (keeps UI synchronous)
-    return { classification: 'अन्य', priority: 'न्यून', source: 'pending_ai' };
+    // Immediate return: conservative fallback (keeps UI synchronous) and includes suggested laws
+    return { classification: 'अन्य', priority: 'न्यून', source: 'pending_ai', suggestedLaws: suggestedLaws.slice(0, 3), investigationProcedure: 'AI विश्लेषण भइरहेको छ...', committeeDecision: 'AI विश्लेषण भइरहेको छ...' };
   },
 
   // Wrapper: call the configured gateway via NVC.Api.analyzeWithGemini
@@ -1182,7 +1251,7 @@ const LOCATION_FIELDS = {
     4: ["गोरखा", "कास्की", "तनहुँ", "लमजुङ", "स्याङ्जा", "मनाङ", "मुस्ताङ", "बाग्लुङ", "पर्वत", "म्याग्दी", "नवलपरासी (बर्दघाट सुस्ता पूर्व)"],
     5: ["गुल्मी", "पाल्पा", "रुपन्देही", "कपिलवस्तु", "नवलपरासी (बर्दघाट सुस्ता पश्चिम)", "अर्घाखाँची", "बाँके", "बर्दिया", "दाङ", "रुकुम (पूर्व)", "रोल्पा", "प्युठान"],
     6: ["कालिकोट", "दैलेख", "जाजरकोट", "डोल्पा", "हुम्ला", "जुम्ला", "मुगु", "रुकुम (पश्चिम)", "सल्यान", "सुर्खेत"],
-    7: ["कैलाली", "अछाम", "डोटी", "बझाङ", "बाजुरा", "दार्चुला", "डडेलधुरा", "बैतडी", "कञ्चनपुर"]
+    7: ["कैलाली", "अछाम", "डोटी", "बझाङ", "बाजुरा", "दार्चुला", "डडेल्धुरा", "बैतडी", "कञ्चनपुर"]
   },
   MUNICIPALITIES: {
     // Populate local levels for provinces using provided lists.
@@ -1425,7 +1494,7 @@ try { NVC.Utils.getCurrentNepaliDateLegacy = _getCurrentNepaliDateLegacy; } catc
 // Initialize inline Nepali dropdown selectors (year / month / day)
 function _initializeNepaliDropdowns() {
   const nepaliMonths = ["बैशाख", "जेठ", "असार", "साउन", "भदौ", "असोज", "कार्तिक", "मंसिर", "पुष", "माघ", "फागुन", "चैत"];
-  const monthDays = [30, 31, 32, 31, 32, 30, 30, 29, 30, 29, 30, 30];
+  const monthDays = [31, 31, 32, 31, 31, 31, 30, 29, 30, 29, 30, 30];
 
   document.querySelectorAll('.nepali-datepicker-dropdown').forEach(wrapper => {
     try {
@@ -1566,6 +1635,23 @@ function _initializeNepaliDropdowns() {
 
       // initial sync: update hidden only if selects had valid values (preserves placeholder when none)
       if (hasHiddenValue && val) updateHidden();
+
+      // आजको AD सँग मेल खाने BS लाइ convertADtoBSAccurate (Sheets जस्तै) सँग मिलाउने — लाइब्रेरी १ गते फरक हुन सक्छ
+      try {
+        if (hidden && hidden.value && yearEl && monthEl && dayEl) {
+          var latinH = typeof _devnagariToLatin === 'function' ? _devnagariToLatin(hidden.value) : hidden.value;
+          var fixedIso = _syncTodayBsToAccurateIfNeeded(latinH);
+          if (fixedIso) {
+            var p = fixedIso.split('-').map(function (x) { return parseInt(x, 10); });
+            yearEl.value = String(p[0]);
+            monthEl.value = String(p[1]);
+            refreshDays(p[0], p[1], p[2]);
+            dayEl.value = String(p[2]);
+            updateHidden();
+          }
+        }
+      } catch (_align) { /* ignore */ }
+
       // mark as initialized to prevent duplicate listeners on repeated calls
       wrapper.dataset.ndpDropdownInit = 'true';
     } catch (e) {
@@ -2002,7 +2088,7 @@ function getFallbackNepaliDate() {
   // यो लगभग सही छ, तर पूर्ण सटीक छैन
 
   // महिनाको दिन संख्या (बैशाख देखि चैत सम्म)
-  const monthDays = [30, 31, 32, 31, 32, 30, 30, 29, 30, 29, 30, 30];
+  const monthDays = [31, 31, 32, 31, 31, 31, 30, 29, 30, 29, 30, 30];
   const nepaliMonths = ["बैशाख", "जेठ", "असार", "साउन", "भदौ", "असोज",
     "कार्तिक", "मंसिर", "पुष", "माघ", "फागुन", "चैत"];
   const weekdays = ["आइतबार", "सोमबार", "मंगलबार", "बुधबार",
@@ -2085,11 +2171,10 @@ function convertADtoBSAccurate(adDateStr) {
         const adMonth = parts[1];
         const adDay = parts[2];
 
-        // Backend formula: bsYear = adYear + 56, bsMonth = adMonth + 8, bsDay = adDay + 17
-        // Adjusted +17 to correct off-by-one for current Nepali date display
+        // Backend formula (same as code.gs convertADtoBS_Manual): +16 on day offset
         let bsYear = adYear + 56;
         let bsMonth = adMonth + 8;
-        let bsDay = adDay + 17;
+        let bsDay = adDay + 16;
 
         if (bsDay > 30) { bsDay -= 30; bsMonth++; }
         if (bsMonth > 12) { bsMonth -= 12; bsYear++; }
@@ -2101,6 +2186,44 @@ function convertADtoBSAccurate(adDateStr) {
     return getFallbackNepaliDate();
   } catch (e) {
     return getFallbackNepaliDate();
+  }
+}
+
+/**
+ * CDN NepaliDatePicker को ad2bs कहिलेकाहीं आजको BS मा backend/Sheets (+१६ सूत्र) भन्दा १ गते फरक पार्छ।
+ * यदि दिइएको BS (YYYY-MM-DD) ले आजको AD दिन्छ र convertADtoBSAccurate भन्दा फरक छ भने सही BS फर्काउँछ।
+ */
+function _syncTodayBsToAccurateIfNeeded(bsIsoOrDisplay) {
+  try {
+    if (!bsIsoOrDisplay || typeof convertADtoBSAccurate !== 'function') return null;
+    let iso = String(bsIsoOrDisplay).trim();
+    if (typeof normalizeNepaliDisplayToISO === 'function') {
+      const n = normalizeNepaliDisplayToISO(iso);
+      if (n) iso = n;
+    }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(iso)) return null;
+    const t = new Date();
+    const pad = function (n) { return String(n).padStart(2, '0'); };
+    const adToday = t.getFullYear() + '-' + pad(t.getMonth() + 1) + '-' + pad(t.getDate());
+    const accurate = convertADtoBSAccurate(adToday);
+    if (!accurate || iso === accurate) return null;
+    var bs2ad = null;
+    if (typeof NepaliDatePicker !== 'undefined' && typeof NepaliDatePicker.bs2ad === 'function') {
+      bs2ad = function (s) { return NepaliDatePicker.bs2ad(s); };
+    } else if (typeof $ !== 'undefined' && $.fn && $.fn.nepaliDatePicker && typeof $.fn.nepaliDatePicker.bs2ad === 'function') {
+      bs2ad = function (s) { return $.fn.nepaliDatePicker.bs2ad(s); };
+    }
+    if (!bs2ad) return null;
+    var adFromBs = '';
+    try {
+      adFromBs = String(bs2ad(iso)).trim().replace(/\//g, '-').slice(0, 10);
+    } catch (_e) {
+      return null;
+    }
+    if (adFromBs !== adToday) return null;
+    return accurate;
+  } catch (_e2) {
+    return null;
   }
 }
 
@@ -2295,6 +2418,12 @@ async function initializeDatepickers() {
         // jQuery plugin प्रयोग गर्ने
         $(input)[jqMethodName](options);
         input.dataset.ndpInitialized = 'true';
+        setTimeout(function () {
+          try {
+            var fixed = _syncTodayBsToAccurateIfNeeded(input.value || input.getAttribute('value') || '');
+            if (fixed) input.value = fixed;
+          } catch (_s) { /* ignore */ }
+        }, 0);
         console.log('✅ Nepali DatePicker initialized (jQuery) for:', input.id || input.className);
       } catch (e) {
         console.warn('⚠️ jQuery plugin failed, trying vanila...', e);
@@ -2306,6 +2435,12 @@ async function initializeDatepickers() {
         // Vanilla JS library प्रयोग गर्ने
         new NepaliDatePicker(input, options);
         input.dataset.ndpInitialized = 'true';
+        setTimeout(function () {
+          try {
+            var fixed = _syncTodayBsToAccurateIfNeeded(input.value || input.getAttribute('value') || '');
+            if (fixed) input.value = fixed;
+          } catch (_s) { /* ignore */ }
+        }, 0);
         console.log('✅ Nepali DatePicker initialized (Vanilla) for:', input.id || input.className);
       } catch (e) {
         console.warn('⚠️ Vanilla failed, trying fallback...', e);
@@ -2353,6 +2488,12 @@ function tryVanillaDatePicker(input, options) {
     try {
       new NepaliDatePicker(input, options);
       input.dataset.ndpInitialized = 'true';
+      setTimeout(function () {
+        try {
+          var fixed = _syncTodayBsToAccurateIfNeeded(input.value || input.getAttribute('value') || '');
+          if (fixed) input.value = fixed;
+        } catch (_s) { /* ignore */ }
+      }, 0);
       console.log('✅ Nepali DatePicker initialized (Vanilla fallback) for:', input.id);
       return true;
     } catch (e) {
@@ -5297,13 +5438,13 @@ function toggleSelectAll(masterCheckbox) {
 function getSelectedComplaints() {
   const checkboxes = document.querySelectorAll('.complaint-select:checked');
   const selectedIds = Array.from(checkboxes).map(cb => cb.getAttribute('data-id'));
-  
+
   // Create a map for O(1) lookup
   const complaintMap = {};
   state.complaints.forEach(c => {
     complaintMap[c.id] = c;
   });
-  
+
   // Return complaints in the order they were selected (checkbox order)
   const selectedComplaints = [];
   selectedIds.forEach(id => {
@@ -5311,7 +5452,7 @@ function getSelectedComplaints() {
       selectedComplaints.push(complaintMap[id]);
     }
   });
-  
+
   return selectedComplaints;
 }
 
@@ -12537,14 +12678,30 @@ function showNewComplaintView() {
 
           <!-- AI Analysis Section -->
           <div id="aiSuggestionBox">
-            <div class="ai-analysis-box hidden" id="aiSuggestionContent" style="margin-top:6px;">
-              <div class="mb-2 border-bottom pb-2"><i class="fas fa-robot"></i> <strong>AI विश्लेषण</strong></div>
-              <div class="row g-2">
-                <div class="col-md-6">
-                  <div id="aiCategoryText" class="mb-1"></div>
-                  <div id="aiPriorityText" class="mb-1"></div>
+            <div class="ai-analysis-box hidden nvc-ai-suggestion-compact" id="aiSuggestionContent" style="margin-top:4px; background:#f8f9fa; border:1px solid #e9ecef; border-radius:8px; padding:6px 8px; font-size:0.9rem; line-height:1.35;">
+              <div class="nvc-ai-suggestion-header mb-1 pb-1 border-bottom d-flex justify-between align-center">
+                <span class="small"><i class="fas fa-robot text-primary"></i> <strong style="color:var(--primary);">AI विश्लेषण</strong></span>
+                <span id="aiLoadingIndicator" class="hidden text-muted small"><i class="fas fa-spinner fa-spin"></i> विश्लेषण हुँदैछ...</span>
+              </div>
+              <div class="row g-2 align-items-stretch nvc-ai-suggestion-row">
+                <div class="col-md-4">
+                  <div class="card h-100 border-0 shadow-sm nvc-ai-mini-card">
+                    <div class="card-body p-2">
+                      <div id="aiCategoryText" class="mb-1 small"></div>
+                      <div id="aiPriorityText" class="mb-0 small"></div>
+                    </div>
+                  </div>
                 </div>
-                <div class="col-md-6"><div id="aiDecisionSuggestion" class="text-small text-muted fst-italic"></div></div>
+                <div class="col-md-4">
+                  <div class="card h-100 border-0 shadow-sm nvc-ai-mini-card">
+                    <div class="card-body p-2" id="aiSuggestedLaws"></div>
+                  </div>
+                </div>
+                <div class="col-md-4">
+                  <div class="card h-100 border-0 shadow-sm nvc-ai-mini-card">
+                    <div class="card-body p-2" id="aiDecisionSuggestion"></div>
+                  </div>
+                </div>
               </div>
             </div>
             <div id="similarComplaintsBox" class="mt-2 hidden">
@@ -12747,6 +12904,76 @@ function showNewComplaintView() {
       dateInput.addEventListener('input', checkDate);
     }
 
+    // Define the AI update handler
+    window.updateAIUI = function (analysis, isAsync = false) {
+      const aiSuggContent = document.getElementById('aiSuggestionContent');
+      if (!aiSuggContent) return;
+
+      aiSuggContent.classList.remove('hidden');
+
+      if (isAsync) {
+        const indicator = document.getElementById('aiLoadingIndicator');
+        if (indicator) indicator.classList.add('hidden');
+      }
+
+      document.getElementById('aiCategoryText').innerHTML = `श्रेणी: <span class="badge badge-secondary">${analysis.category || 'अन्य'}</span>`;
+      document.getElementById('aiPriorityText').innerHTML = `प्राथमिकता: <span class="badge ${analysis.priority === 'उच्च' ? 'badge-danger' : analysis.priority === 'मध्यम' ? 'badge-warning' : 'badge-success'}">${analysis.priority || 'न्यून'}</span>`;
+      document.getElementById('aiCategoryText').innerHTML += ` <br>वर्गीकरण: <span class="badge badge-info">${analysis.classification || 'अन्य'}</span>`;
+
+      let committeeDecision = analysis.committeeDecision || 'सामान्य प्रक्रियामा राख्ने।';
+      let investigationProcedure = analysis.investigationProcedure || 'सम्बन्धित निकायबाट विवरण माग गर्ने।';
+      try {
+        if (window.NVC && NVC.Api && typeof NVC.Api.alignInvestigationProcedureToCommitteeDecision === 'function') {
+          const aligned = NVC.Api.alignInvestigationProcedureToCommitteeDecision(committeeDecision, investigationProcedure);
+          if (aligned) investigationProcedure = aligned;
+        }
+      } catch (e) { /* ignore */ }
+
+      document.getElementById('aiDecisionSuggestion').innerHTML = `
+        <div class="nvc-ai-decision-inner text-success" style="font-weight:600;">
+          <h6 class="mb-1 small text-success"><i class="fas fa-gavel"></i> उजुरी व्यवस्थापन समितिको निर्णय प्रस्ताव</h6>
+          <p class="mb-2 text-dark small" style="font-weight:500;">${committeeDecision}</p>
+          <h6 class="mb-1 small text-info"><i class="fas fa-search"></i> छानविन प्रकृया सुझाव</h6>
+          <p class="mb-0 text-muted small" style="font-size:0.8rem;line-height:1.35;">${investigationProcedure}</p>
+        </div>
+      `;
+
+      const aiSuggestedLawsEl = document.getElementById('aiSuggestedLaws');
+      if (aiSuggestedLawsEl) {
+        if (analysis.suggestedLaws && analysis.suggestedLaws.length > 0) {
+          aiSuggestedLawsEl.innerHTML = `
+            <div class="nvc-ai-laws-inner">
+              <strong class="d-block mb-1 text-primary small"><i class="fas fa-balance-scale"></i> सम्बन्धित ऐन/कानूनका प्रावधानहरू:</strong>
+              <div class="list-group list-group-flush border-start border-primary border-2 ps-2 nvc-ai-laws-list">
+                ${analysis.suggestedLaws.map(law => `
+                  <div class="mb-0 pb-1">
+                    <span class="fw-bold text-dark small">${law.name}</span>:
+                    <span class="text-muted" style="font-size:0.8rem;">${law.description || ''}</span>
+                  </div>
+                `).join('')}
+              </div>
+            </div>
+          `;
+        } else {
+          aiSuggestedLawsEl.innerHTML = '';
+        }
+      }
+    };
+
+    // Attach to event for async updates
+    const aiUpdateListener = function (e) {
+      if (e.detail && e.detail.result) {
+        window.updateAIUI(e.detail.result, true);
+      }
+    };
+
+    // Remove old listener if exists to prevent duplicates
+    if (window._nvcAiFormListener) {
+      document.removeEventListener('nvc.ai.analysis.updated', window._nvcAiFormListener);
+    }
+    window._nvcAiFormListener = aiUpdateListener;
+    document.addEventListener('nvc.ai.analysis.updated', window._nvcAiFormListener);
+
     const descTextarea = document.getElementById('complaintDescription');
     if (descTextarea) {
       descTextarea.addEventListener('input', function () {
@@ -12764,22 +12991,12 @@ function showNewComplaintView() {
         }
 
         if (text.length > 10) {
+          const indicator = document.getElementById('aiLoadingIndicator');
+          if (indicator) indicator.classList.remove('hidden');
+
           // 1. AI Analysis
           const analysis = AI_SYSTEM.analyzeComplaint(text);
-          const aiSuggContent = document.getElementById('aiSuggestionContent');
-          if (aiSuggContent) {
-            aiSuggContent.classList.remove('hidden');
-            document.getElementById('aiCategoryText').innerHTML = `श्रेणी: <span class="badge badge-secondary">${analysis.category}</span>`;
-            document.getElementById('aiPriorityText').innerHTML = `प्राथमिकता: <span class="badge ${analysis.priority === 'उच्च' ? 'badge-danger' : analysis.priority === 'मध्यम' ? 'badge-warning' : 'badge-success'}">${analysis.priority}</span>`;
-            document.getElementById('aiCategoryText').innerHTML += ` <br>वर्गीकरण: <span class="badge badge-info">${analysis.classification}</span>`;
-
-            // Auto-categorization for decision
-            let decisionSugg = '';
-            if (analysis.priority === 'उच्च') decisionSugg = 'सुझाव: तुरुन्त कारबाही प्रक्रिया अगाडि बढाउने।';
-            else if (analysis.category === 'प्राविधिक') decisionSugg = 'सुझाव: प्राविधिक टोली खटाउने।';
-            else decisionSugg = 'सुझाव: सामान्य प्रक्रियामा राख्ने।';
-            document.getElementById('aiDecisionSuggestion').textContent = decisionSugg;
-          }
+          if (typeof updateAIUI === 'function') updateAIUI(analysis, false);
 
           // 2. Shakha Suggestion (Admin only usually, but logic runs)
           const shakhaCode = AI_SYSTEM.suggestShakha(text);
@@ -18426,11 +18643,11 @@ function loadEditDistricts() {
   const districtSelect = document.getElementById('editDistrict');
   if (!provinceSelect || !districtSelect) return;
   const provinceId = provinceSelect.value;
-  
+
   const currentVal = districtSelect.value;
   const dataSelected = districtSelect.dataset && districtSelect.dataset.selected ? districtSelect.dataset.selected : districtSelect.getAttribute('data-selected');
   const selVal = dataSelected || currentVal;
-  
+
   districtSelect.innerHTML = '<option value="">जिल्ला छन्नुहोस्</option>';
   if (provinceId && LOCATION_FIELDS.DISTRICTS[provinceId]) {
     LOCATION_FIELDS.DISTRICTS[provinceId].forEach(dist => {
@@ -19392,12 +19609,12 @@ function toggleFieldSpeech(fieldId, btnId) {
           // Append new text only if it's different from last processed text
           if (finalTranscript && finalTranscript.trim().length > 0) {
             const trimmedTranscript = finalTranscript.trim();
-            
+
             // Initialize lastTranscript if not exists
             if (!state.lastTranscript) {
               state.lastTranscript = '';
             }
-            
+
             // Only append if this is new text (different from last processed)
             if (trimmedTranscript !== state.lastTranscript) {
               field.value = (field.value ? field.value + ' ' : '') + trimmedTranscript;

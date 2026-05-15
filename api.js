@@ -1,12 +1,71 @@
-(function(){
+(function () {
   if (typeof window === 'undefined') return;
   window.NVC = window.NVC || {};
   NVC.Api = NVC.Api || {};
 
   const cfg = NVC.Config && NVC.Config.GOOGLE_SHEETS_CONFIG;
 
+  /**
+   * समितिको निर्णय प्रस्ताव (मोडेलको पाठ) अनुसार छानविन प्रकृया सुझाव मिलाउने — दर्ता फारम AI बक्सको लागि।
+   * निर्णय वाक्यांशहरू प्राथमिकता: विशिष्ट (लामो) पहिले, सामान्य पछि।
+   */
+  function alignInvestigationProcedureToCommitteeDecision(committeeDecision, modelProcedure) {
+    const d = String(committeeDecision || '').trim();
+    if (!d) return modelProcedure || '';
+    const pairs = [
+      {
+        re: /अख्तियार दुरुपयोग अनुसन्धान आयोगलाई सम्बोधन/i,
+        proc: 'अख्तियार दुरुपयोग अनुसन्धान आयोगसँग समन्वय राख्दै केन्द्रलाई बोधार्थ अभिलेख गर्ने; थप आधार प्रमाण वा उजुरी प्राप्त भएपछि समितिमा पुनः प्रस्तुत गर्ने।'
+      },
+      {
+        re: /अन्य निकायलाई सम्बोधन गरी केन्द्रलाई बोधार्थ.*सो निकायमा लेखी पठाउने/i,
+        proc: 'सम्बोधित अन्य निकायमा आवश्यक छानविन तथा कारबाही गरी केन्द्रलाई जानकारी आउने गरी लेखी पठाउने; प्रतिवेदन प्राप्त भएपछि अभिलेख तथा अनुगमन गर्ने।'
+      },
+      {
+        re: /उजुरीमा उल्लेखित व्यहोरा स्पष्ट नभएकोले.*तामेलीमा राख्ने/i,
+        proc: 'उजुरीमा उल्लेखित व्यहोरा स्पष्ट नभएकोले तामेलीमा राखी थप स्पष्ट विवरण सहितको उजुरी प्राप्त भएपछि छानविन प्रक्रिया सञ्चालन गर्ने।'
+      },
+      {
+        re: /उजुरीका सम्बन्धमा पछि थप आधार प्रमाण फेला परेमा.*तामेलीमा राख्ने/i,
+        proc: 'थप आधार प्रमाण प्राप्त भएपछि सोही बमोजिम कारबाही हुने सम्भावनाका लागि उजुरीलाई तामेलीमा राखी नियमित अनुगमन गर्ने।'
+      },
+      {
+        re: /छानविन गर्न टोली गठन गर्ने/i,
+        proc: 'उजुरीमा उल्लेखित विषयमा छानविन गर्न समितिबाट टोली गठन गरी कार्यदिशा, समयसीमा र प्रतिवेदन ढाँचा तोकी अनुसन्धान अघि बढाउने।'
+      },
+      {
+        re: /छानविन गरी राय सहितको प्रतिवेदन पठाउन लेखी पठाउने/i,
+        proc: 'उजुरीमा उल्लेखित विषयमा छानविन गरी राय सहितको प्रतिवेदन तयार पारी सम्बन्धित निकाय वा केन्द्रमा पठाउने प्रकृया पूरा गर्न सुझाउने।'
+      },
+      {
+        re: /आवश्यक छानविन गरी कारबाही कारबाही गर्न लेखी पठाउने/i,
+        proc: 'आवश्यक छानविन सम्पन्न गरी निष्कर्षसहित कानुन बमोजिम कारबाही अघि बढाउने प्रक्रिया (प्रमाण सङ्कलन, खण्डिक विभाजन, निर्णय) मार्गनिर्देश गर्ने।'
+      },
+      {
+        re: /आवश्यक छानविन तथा कारबाही गरी केन्द्रलाई जानकारी गराउन लेखी पठाउने/i,
+        proc: 'छानविन तथा कारबाही गरी प्राप्त नतिजा र जानकारी केन्द्रमा पेश गर्न आवश्यक पत्राचार र प्रतिवेदन तयार गर्ने प्रकृया अघि बढाउने।'
+      },
+      {
+        re: /सम्बद्ध विवरण कागजात सहित राय\/?प्रतिक्रिया माग गर्ने/i,
+        proc: 'सम्बद्ध विवरण कागजात सहित राय/प्रतिक्रिया माग गरी छानविन अघि बढाउने।'
+      },
+      {
+        re: /बुँदागत रुपमा राय प्रतिक्रिया माग गर्ने/i,
+        proc: 'उजुरीमा उल्लेखित विषयका बुँदाहरू खाताउँदै राय/प्रतिक्रिया माग गरी प्राप्त जवाफका आधारमा छानविन सञ्चालन गर्ने।'
+      }
+    ];
+    for (let i = 0; i < pairs.length; i++) {
+      if (pairs[i].re.test(d)) return pairs[i].proc;
+    }
+    return modelProcedure || '';
+  }
+
+  try {
+    NVC.Api.alignInvestigationProcedureToCommitteeDecision = alignInvestigationProcedureToCommitteeDecision;
+  } catch (e) { /* ignore */ }
+
   // Full-featured JSONP-based GET (moved from script.js)
-  NVC.Api.getFromGoogleSheets = async function(action, params = {}) {
+  NVC.Api.getFromGoogleSheets = async function (action, params = {}) {
     if (!cfg || !cfg.ENABLED) {
       console.log('ℹ️ Google Sheets disabled');
       return { success: false, data: [], message: 'Integration disabled' };
@@ -23,19 +82,19 @@
       const v = params[key];
       if (v !== undefined && v !== null && v !== '') url += `&${encodeURIComponent(key)}=${encodeURIComponent(String(v))}`;
     });
-    const callbackName = `jsonp_${action}_${Date.now()}_${Math.floor(Math.random()*1000)}`;
+    const callbackName = `jsonp_${action}_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
     url += `&callback=${callbackName}`;
     url += `&t=${Date.now()}`;
 
     const parseResponseText = (text) => {
       const trimmed = String(text).trim();
-      
+
       // Check if response is HTML (error page) instead of JSON
       if (trimmed.startsWith('<!DOCTYPE') || trimmed.startsWith('<html') || trimmed.startsWith('<')) {
         console.warn('Received HTML response instead of JSON, likely a 404 or error page');
         return { success: false, message: 'Google Apps Script endpoint not available (404 error)', data: [] };
       }
-      
+
       let parsed = null;
       try {
         if (trimmed.startsWith(`${callbackName}(`) && trimmed.endsWith(')')) {
@@ -47,7 +106,7 @@
         console.warn('Failed to parse response as JSON:', parseError, 'Response text:', trimmed.substring(0, 200));
         return { success: false, message: 'Invalid JSON response from server', data: [] };
       }
-      
+
       if (Array.isArray(parsed)) {
         return { success: true, data: parsed, count: parsed.length };
       }
@@ -63,7 +122,7 @@
     if (typeof fetch === 'function') {
       try {
         const response = await fetch(url, { method: 'GET', credentials: 'omit', cache: 'no-store' });
-        
+
         // Check for HTTP errors
         if (!response.ok) {
           console.warn(`HTTP error: ${response.status} ${response.statusText}`);
@@ -72,7 +131,7 @@
           }
           return { success: false, message: `HTTP ${response.status}: ${response.statusText}`, data: [] };
         }
-        
+
         const text = await response.text();
         return parseResponseText(text);
       } catch (fetchError) {
@@ -89,9 +148,9 @@
         const cleanup = (removeCallback = true) => {
           clearTimeout(timeout);
           if (removeCallback) {
-            try { if (globalObject[callbackName]) delete globalObject[callbackName]; } catch (e) {}
+            try { if (globalObject[callbackName]) delete globalObject[callbackName]; } catch (e) { }
           }
-          try { if (script && script.parentNode) script.parentNode.removeChild(script); } catch (e) {}
+          try { if (script && script.parentNode) script.parentNode.removeChild(script); } catch (e) { }
         };
 
         const timeout = setTimeout(() => {
@@ -114,7 +173,7 @@
           }
         }, cfg.TIMEOUT || 30000);
 
-        globalObject[callbackName] = function(response) {
+        globalObject[callbackName] = function (response) {
           if (isResolved) return;
           isResolved = true; cleanup();
           let formatted = response || { success: false, data: [] };
@@ -126,12 +185,12 @@
 
         const script = document.createElement('script');
         script.src = url; script.async = true;
-        script.onerror = function(error) {
+        script.onerror = function (error) {
           if (isResolved) return;
           if (retryCount < (cfg.MAX_RETRIES || 3)) {
             retryCount++;
             setTimeout(() => {
-              try { url = url.replace(/&t=\d+/, `&t=${Date.now()}`); } catch (e) {}
+              try { url = url.replace(/&t=\d+/, `&t=${Date.now()}`); } catch (e) { }
               const newScript = document.createElement('script'); newScript.src = url; newScript.async = true; newScript.onerror = script.onerror;
               document.head.appendChild(newScript);
             }, (cfg.RETRY_DELAY || 1000) * retryCount);
@@ -142,7 +201,7 @@
               .then(resp => resp.text())
               .then(text => resolve(parseResponseText(text)))
               .catch(fetchError => {
-                try { if (typeof NVC.UI !== 'undefined' && typeof NVC.UI.showToast === 'function') NVC.UI.showToast('❌ Google Sheets connect हुन सकेन। Apps Script Web App deployment (Anyone access) र URL जाँच गर्नुहोस्।', {bg:'#d32f2f'}); } catch (e) {}
+                try { if (typeof NVC.UI !== 'undefined' && typeof NVC.UI.showToast === 'function') NVC.UI.showToast('❌ Google Sheets connect हुन सकेन। Apps Script Web App deployment (Anyone access) र URL जाँच गर्नुहोस्।', { bg: '#d32f2f' }); } catch (e) { }
                 console.error('❌ Google Sheets Script Load Error: Possible CORS or Permissions issue. Ensure "Who has access" is set to "Anyone". URL:', url, fetchError);
                 resolve({ success: false, data: [], message: 'Network error after retries', action });
               });
@@ -157,7 +216,7 @@
   };
 
   // POST helper for large payloads to Google Sheets (avoids long-URL/JSONP truncation)
-  NVC.Api.postLargeToGoogleSheets = async function(action, data = {}) {
+  NVC.Api.postLargeToGoogleSheets = async function (action, data = {}) {
     if (!cfg || !cfg.ENABLED) {
       return { success: true, message: 'Data saved locally (Google Sheets disabled)', id: data.id || null, local: true };
     }
@@ -189,7 +248,7 @@
   };
 
   // Full-featured JSONP POST (moved from script.js)
-  NVC.Api.postToGoogleSheets = async function(action, data = {}) {
+  NVC.Api.postToGoogleSheets = async function (action, data = {}) {
     if (!cfg || !cfg.ENABLED) {
       return { success: true, message: 'Data saved locally (Google Sheets disabled)', id: data.id || null, local: true };
     }
@@ -239,7 +298,7 @@
         url += `&t=${Date.now()}`; // Add timestamp to prevent caching
 
         const enhanced = { ...data };
-        try { Object.keys(data || {}).forEach(k => { const v = data[k]; if (v === undefined || v === null) return; const keyStr = String(k); const dateRegex = /date|मिति|दर्ता/i; if (dateRegex.test(keyStr)) { try { if (typeof NVC.Utils !== 'undefined' && typeof NVC.Utils.latinToDevanagari === 'function') enhanced[k] = NVC.Utils.latinToDevanagari(String(v)); else enhanced[k] = String(v); enhanced[`${k}Iso`] = String(v); } catch (e) {} } }); } catch (e) {}
+        try { Object.keys(data || {}).forEach(k => { const v = data[k]; if (v === undefined || v === null) return; const keyStr = String(k); const dateRegex = /date|मिति|दर्ता/i; if (dateRegex.test(keyStr)) { try { if (typeof NVC.Utils !== 'undefined' && typeof NVC.Utils.latinToDevanagari === 'function') enhanced[k] = NVC.Utils.latinToDevanagari(String(v)); else enhanced[k] = String(v); enhanced[`${k}Iso`] = String(v); } catch (e) { } } }); } catch (e) { }
 
         Object.keys(enhanced).forEach(key => { const value = enhanced[key]; if (value !== undefined && value !== null) { url += `&${encodeURIComponent(key)}=${encodeURIComponent(String(value))}`; } });
         const callbackName = `post_${action}_${Date.now()}`;
@@ -250,11 +309,11 @@
           if (!isResolved) { didTimeout = true; isResolved = true; resolve({ success: false, message: 'Request timed out. Saved locally for later sync.', id: data.id, local: true, timeout: true }); }
         }, cfg.TIMEOUT || 60000);
 
-        window[callbackName] = function(response) {
+        window[callbackName] = function (response) {
           if (lateHandled) return;
-          if (didTimeout) { lateHandled = true; try { const isSuccess = response && (response.success === true || response.success === 'true'); if (isSuccess) { try { if (typeof NVC.UI !== 'undefined' && typeof NVC.UI.showToast === 'function') NVC.UI.showToast('✅ उजुरी Google Sheet मा सेभ भयो (ढिलो प्रतिक्रिया)', {bg:'#2e7d32'}); } catch (e) {} } } catch (e) {} finally { try { delete window[callbackName]; } catch(e){}; try { if (script && script.parentNode) script.parentNode.removeChild(script); } catch (e) {} } return; }
-          if (isResolved) return; isResolved = true; clearTimeout(timeout); try { delete window[callbackName]; } catch (e) {};
-          try { if (script && script.parentNode) script.parentNode.removeChild(script); } catch (e) {}
+          if (didTimeout) { lateHandled = true; try { const isSuccess = response && (response.success === true || response.success === 'true'); if (isSuccess) { try { if (typeof NVC.UI !== 'undefined' && typeof NVC.UI.showToast === 'function') NVC.UI.showToast('✅ उजुरी Google Sheet मा सेभ भयो (ढिलो प्रतिक्रिया)', { bg: '#2e7d32' }); } catch (e) { } } } catch (e) { } finally { try { delete window[callbackName]; } catch (e) { }; try { if (script && script.parentNode) script.parentNode.removeChild(script); } catch (e) { } } return; }
+          if (isResolved) return; isResolved = true; clearTimeout(timeout); try { delete window[callbackName]; } catch (e) { };
+          try { if (script && script.parentNode) script.parentNode.removeChild(script); } catch (e) { }
           let formatted = response || { success: false, message: 'No response from server', id: data.id, local: true };
           if (typeof formatted === 'string') { try { formatted = JSON.parse(formatted); } catch (e) { formatted = { success: false, message: formatted, id: data.id, local: true }; } }
           if (formatted.success === undefined) formatted.success = false;
@@ -262,7 +321,7 @@
         };
 
         const script = document.createElement('script'); script.src = url; script.async = true;
-        script.onerror = function(error) {
+        script.onerror = function (error) {
           if (isResolved) return;
           (async () => {
             try {
@@ -271,11 +330,11 @@
               Object.keys(enhanced || data).forEach(k => { const v = (enhanced && enhanced[k] !== undefined) ? enhanced[k] : data[k]; if (v !== undefined && v !== null) bodyParams.append(k, String(v)); });
               const resp = await fetch(cfg.WEB_APP_URL, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: bodyParams.toString(), credentials: 'omit' });
               let json = null; try { json = await resp.json(); } catch (e) { json = null; }
-              if (json && (json.success === true || json.success === 'true')) { isResolved = true; try { delete window[callbackName]; } catch (e) {} try { if (script && script.parentNode) script.parentNode.removeChild(script); } catch (e) {} resolve(json); return; }
+              if (json && (json.success === true || json.success === 'true')) { isResolved = true; try { delete window[callbackName]; } catch (e) { } try { if (script && script.parentNode) script.parentNode.removeChild(script); } catch (e) { } resolve(json); return; }
             } catch (fetchError) {
               console.error('❌ Google Sheets Fallback Fetch Error:', fetchError);
             }
-            if (isResolved) return; isResolved = true; clearTimeout(timeout); try { delete window[callbackName]; } catch (e) {} try { if (script && script.parentNode) script.parentNode.removeChild(script); } catch (e) {} resolve({ success: false, message: 'Network error - saved locally', id: data.id, local: true, error: String(error) });
+            if (isResolved) return; isResolved = true; clearTimeout(timeout); try { delete window[callbackName]; } catch (e) { } try { if (script && script.parentNode) script.parentNode.removeChild(script); } catch (e) { } resolve({ success: false, message: 'Network error - saved locally', id: data.id, local: true, error: String(error) });
           })();
         };
 
@@ -287,22 +346,45 @@
   };
 
   // Analyze text using configured AI gateway (Gemini). Returns the parsed AI response or { success:false, error }
-  NVC.Api.analyzeWithGemini = async function(text) {
+  NVC.Api.analyzeWithGemini = async function (text) {
     try {
       const aiUrl = (NVC.Config && NVC.Config.AI_GATEWAY_URL) ? NVC.Config.AI_GATEWAY_URL : '';
       if (!aiUrl) return { success: false, error: 'AI_GATEWAY_URL not configured' };
 
+      const promptContext = `तपाईं एक उजुरी विश्लेषण विशेषज्ञ हुनुहुन्छ। तल दिइएको उजुरीको विवरण पढेर नेपालको प्रचलित ऐन, नियम र कानूनहरूको आधारमा विश्लेषण गरी निम्न कुराहरू समावेश गरी JSON फर्म्याटमा मात्र उत्तर दिनुहोस् (अरू व्याख्या वा Markdown नलेख्नुहोस्):
+1. priority: "उच्च", "मध्यम", वा "न्यून" (गम्भीरताको आधारमा)
+2. classification: उजुरीको वर्ग (जस्तै: भ्रष्टाचार, सार्वजनिक खरिद, सेवा प्रवाह, कर्मचारी आचरण, पूर्वाधार निर्माण आदि)
+3. summary: उजुरीको संक्षिप्त सारांश (नेपालीमा)
+4. suggestedLaws: यस उजुरीसँग सम्बन्धित प्रचलित नेपालका ऐन, नियम र नियमावलीहरू (जस्तै: भ्रष्टाचार निवारण ऐन २०५९, सार्वजनिक खरिद ऐन २०६३ आदि) र सम्बन्धित दफा/नियमको नाम र छोटो व्याख्या सहितको Array (प्रत्येक item मा 'name' र 'description' भएको object)
+5. committeeDecision: उजुरी व्यवस्थापन समितिको निर्णय प्रस्ताव। तलका सम्भावित निर्णय मध्ये उजुरीको प्रकृति अनुसार एउटा मात्र छानी तल लेखिएकै शब्द/वाक्य संरचनामा नजिक राखेर लेख्नुहोस् (अङ्क वा बिन्दु नम्बर नथप्नुहोस्):
+   - उजुरीमा उल्लेखित विषयमा बुँदागत रुपमा राय प्रतिक्रिया माग गर्ने।
+   - सम्बद्ध विवरण कागजात सहित राय/प्रतिक्रिया माग गर्ने।
+   - आवश्यक छानविन तथा कारबाही गरी केन्द्रलाई जानकारी गराउन लेखी पठाउने।
+   - आवश्यक छानविन गरी कारबाही कारबाही गर्न लेखी पठाउने।
+   - उजुरीमा उल्लेखित विषयमा छानविन गरी राय सहितको प्रतिवेदन पठाउन लेखी पठाउने।
+   - उजुरीमा उल्लेखित विषयमा छानविन गर्न टोली गठन गर्ने।
+   - अख्तियार दुरुपयोग अनुसन्धान आयोगलाई सम्बोधन गरी केन्द्रलाई बोधार्थ दिइएकोमा सो आयोगबाट समेत छानविन भैरहेको हुनसक्ने भएकोले पछि थप आधार प्रमाण फेला परेमा वा थप उजुरी प्राप्त भएमा सोही बमोजिम हुने नै हुँदा हाल तामेलीमा राख्ने।
+   - अन्य निकायलाई सम्बोधन गरी केन्द्रलाई बोधार्थ दिइएकोमा आवश्यक छानविन तथा कारबाही गरी केन्द्रलाई जानकारी गराउन सो निकायमा लेखी पठाउने।
+   - उजुरीका सम्बन्धमा पछि थप आधार प्रमाण फेला परेमा सोही बमोजिम हुने नै हुँदा हाल उजुरीलाई तामेलीमा राख्ने।
+   - उजुरीमा उल्लेखित व्यहोरा स्पष्ट नभएकोले पछि थप स्पष्ट व्यहोराको उजुरी प्राप्त हुन आएमा सोही बमोजिम हुने नै हुँदा हाल उजुरीलाई तामेलीमा राख्ने।
+6. investigationProcedure: committeeDecision ले तोकेको कार्यसँग पूर्ण मेल खाने गरी कानुनी तथा प्राविधिक छानविन प्रकृया लेख्नुहोस्। investigationProcedure मा committeeDecision मा नभएका नयाँ दिशा वा विपरीत कार्य नसमावेश गर्नुहोस्।
+   उदाहरण: committeeDecision "सम्बद्ध विवरण कागजात सहित राय/प्रतिक्रिया माग गर्ने।" भएमा investigationProcedure अनिवार्य रूपमा सोही मागलाई छानविनको पहिलो चरण मान्दै लेख्नुहोस्, जस्तै: "सम्बद्ध विवरण कागजात सहित राय/प्रतिक्रिया माग गरी छानविन अघि बढाउने।"
+   अन्य निर्णय प्रस्तावहरूका लागि पनि सोही निर्णयमा उल्लेख भएका क्रियाहरू (बुँदागत माग, कागजात सहित माग, छानविन/कारबाही, केन्द्रलाई जानकारी, टोली गठन, तामेली, अन्य निकाय वा आयोगलाई सम्बोधन आदि) लाई छानविन प्रकृयाको चरणबद्ध वर्णनमा दोहोर्याउनुहोस्।
+
+उजुरीको विवरण:
+${text}`;
+
       const resp = await fetch(aiUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text }),
+        body: JSON.stringify({ text: promptContext }),
         cache: 'no-store',
         credentials: 'omit'
       });
 
       if (!resp || (resp.status && resp.status >= 400)) {
         let txt = '';
-        try { txt = await resp.text(); } catch(e){}
+        try { txt = await resp.text(); } catch (e) { }
         return { success: false, error: `AI gateway error: ${resp.status || 'unknown'}`, raw: txt };
       }
 
@@ -354,7 +436,7 @@
 
       // Try parse JSON body from textual output (some prompts ask model to return JSON)
       let parsed = null;
-      try { parsed = textOut && textOut.trim().startsWith('{') ? JSON.parse(textOut) : null; } catch(e) { parsed = null; }
+      try { parsed = textOut && textOut.trim().startsWith('{') ? JSON.parse(textOut) : null; } catch (e) { parsed = null; }
 
       const result = { success: true, raw: data };
 
@@ -363,6 +445,15 @@
         result.classification = parsed.classification || parsed.category || parsed.type || null;
         result.summary = parsed.summary || parsed.excerpt || parsed.description || null;
         result.sentiment = parsed.sentiment || parsed.tone || null;
+        result.suggestedLaws = parsed.suggestedLaws || [];
+        result.committeeDecision = parsed.committeeDecision || parsed.decision || null;
+        result.investigationProcedure = parsed.investigationProcedure || parsed.procedure || null;
+        if (result.committeeDecision) {
+          result.investigationProcedure = alignInvestigationProcedureToCommitteeDecision(
+            result.committeeDecision,
+            result.investigationProcedure
+          );
+        }
         result.parsed = parsed;
         return result;
       }
@@ -394,7 +485,7 @@
   };
 
   // loadDataFromGoogleSheets: delegate to NVC.Api.getFromGoogleSheets multiple calls and format
-  NVC.Api.loadDataFromGoogleSheets = async function(forceReload = false) {
+  NVC.Api.loadDataFromGoogleSheets = async function (forceReload = false) {
     if (window._isLoadingData && !forceReload) return window._lastLoadResult || false;
     if (!cfg || !cfg.ENABLED) return false;
     window._isLoadingData = true;
@@ -428,7 +519,7 @@
       } catch (e) {
         console.warn('Technical Inspectors load failed', e);
       }
-      
+
       // Load Employee Monitoring
       try {
         const empRes = await NVC.Api.getFromGoogleSheets('getEmployeeMonitoring');
@@ -437,7 +528,7 @@
           const formatted = (empData || []).map(item => { try { if (typeof formatEmployeeMonitoringFromSheet === 'function') return formatEmployeeMonitoringFromSheet(item); return item; } catch (e) { return null; } }).filter(Boolean);
           if (NVC.State && typeof NVC.State.set === 'function') NVC.State.set('employeeMonitoring', formatted);
         }
-      } catch(e) { console.warn('Employee Monitoring load failed', e); }
+      } catch (e) { console.warn('Employee Monitoring load failed', e); }
 
       // Load Citizen Charter
       try {
@@ -447,7 +538,7 @@
           const formatted = (ccData || []).map(item => { try { if (typeof formatCitizenCharterFromSheet === 'function') return formatCitizenCharterFromSheet(item); return item; } catch (e) { return null; } }).filter(Boolean);
           if (NVC.State && typeof NVC.State.set === 'function') NVC.State.set('citizenCharters', formatted);
         }
-      } catch(e) { console.warn('Citizen Charter load failed', e); }
+      } catch (e) { console.warn('Citizen Charter load failed', e); }
 
       // Load Investigations
       try {
@@ -457,7 +548,7 @@
           const formatted = (invData || []).map(item => { try { if (typeof formatInvestigationFromSheet === 'function') return formatInvestigationFromSheet(item); return item; } catch (e) { return null; } }).filter(Boolean);
           if (NVC.State && typeof NVC.State.set === 'function') NVC.State.set('investigations', formatted);
         }
-      } catch(e) { console.warn('Investigations load failed', e); }
+      } catch (e) { console.warn('Investigations load failed', e); }
 
       // Load Technical Examiners
       try {
@@ -467,7 +558,7 @@
           const formatted = (examData || []).map(item => { try { if (typeof formatTechnicalExaminerFromSheet === 'function') return formatTechnicalExaminerFromSheet(item); return item; } catch (e) { return null; } }).filter(Boolean);
           if (NVC.State && typeof NVC.State.set === 'function') NVC.State.set('technicalExaminers', formatted);
         }
-      } catch(e) { console.warn('Technical Examiners load failed', e); }
+      } catch (e) { console.warn('Technical Examiners load failed', e); }
 
       window._lastLoadResult = true;
       return true;
@@ -476,7 +567,7 @@
   };
 
   // Save a complaint (migrated from script.js)
-  NVC.Api.saveComplaintToGoogleSheets = async function(complaintData) {
+  NVC.Api.saveComplaintToGoogleSheets = async function (complaintData) {
     const stateObj = window.state || (NVC.State && NVC.State.state) || {};
     if (!cfg || !cfg.ENABLED || stateObj.useLocalData || complaintData?.useLocal) {
       const newComplaint = {
@@ -502,7 +593,7 @@
           stateObj.complaints = stateObj.complaints || [];
           stateObj.complaints.unshift(newComplaint);
         }
-      } catch (e) {}
+      } catch (e) { }
       return { success: true, message: 'Complaint saved locally', id: newComplaint.id };
     }
 
@@ -542,7 +633,7 @@
             stateObj.complaints = stateObj.complaints || [];
             stateObj.complaints.unshift(newComplaint);
           }
-        } catch(e){}
+        } catch (e) { }
         return result;
       }
 
@@ -558,7 +649,7 @@
     }
   };
 
-  NVC.Api.updateComplaintInGoogleSheets = async function(complaintId, updateData) {
+  NVC.Api.updateComplaintInGoogleSheets = async function (complaintId, updateData) {
     const stateObj = window.state || (NVC.State && NVC.State.state) || {};
     if (!cfg || !cfg.ENABLED || stateObj.useLocalData) {
       const index = (stateObj.complaints || []).findIndex(c => c.id === complaintId);
@@ -569,7 +660,7 @@
           } else {
             stateObj.complaints[index] = { ...stateObj.complaints[index], ...updateData };
           }
-        } catch(e){}
+        } catch (e) { }
         return { success: true, message: 'Complaint updated locally' };
       }
       return { success: false, message: 'Complaint not found' };
@@ -592,7 +683,7 @@
             } else {
               stateObj.complaints[index] = { ...stateObj.complaints[index], ...updateData };
             }
-          } catch(e){}
+          } catch (e) { }
         }
       }
       return result;
@@ -603,7 +694,7 @@
   };
 
   // Notice Management Functions
-  NVC.Api.saveNoticeToGoogleSheets = async function(noticeData) {
+  NVC.Api.saveNoticeToGoogleSheets = async function (noticeData) {
     const stateObj = window.state || (NVC.State && NVC.State.state) || {};
     if (!cfg || !cfg.ENABLED || stateObj.useLocalData || noticeData?.useLocal) {
       const newNotice = {
@@ -615,7 +706,7 @@
         uploadedBy: stateObj.currentUser?.name || 'admin_planning',
         createdAt: new Date().toISOString()
       };
-      
+
       try {
         if (NVC.State && typeof NVC.State.push === 'function') {
           NVC.State.push('notices', newNotice);
@@ -623,7 +714,7 @@
           stateObj.notices = stateObj.notices || [];
           stateObj.notices.unshift(newNotice);
         }
-      } catch (e) {}
+      } catch (e) { }
       return { success: true, message: 'Notice saved locally', id: newNotice.id };
     }
 
@@ -636,9 +727,9 @@
         publishDate: noticeData.publishDate,
         uploadedBy: stateObj.currentUser?.name
       };
-      
+
       const result = await NVC.Api.postToGoogleSheets('saveNotice', payload);
-      
+
       if (result && result.success) {
         const newNotice = {
           id: result.id || noticeData.id,
@@ -648,7 +739,7 @@
           publishDate: noticeData.publishDate,
           uploadedBy: stateObj.currentUser?.name
         };
-        
+
         try {
           if (NVC.State && typeof NVC.State.push === 'function') {
             NVC.State.push('notices', newNotice);
@@ -656,7 +747,7 @@
             stateObj.notices = stateObj.notices || [];
             stateObj.notices.unshift(newNotice);
           }
-        } catch(e) {}
+        } catch (e) { }
         return result;
       }
 
@@ -672,7 +763,7 @@
     }
   };
 
-  NVC.Api.getNoticesFromGoogleSheets = async function() {
+  NVC.Api.getNoticesFromGoogleSheets = async function () {
     if (!cfg || !cfg.ENABLED) {
       const stateObj = window.state || (NVC.State && NVC.State.state) || {};
       return { success: true, data: stateObj.notices || [] };
@@ -692,7 +783,7 @@
     }
   };
 
-  NVC.Api.getActiveNoticesFromGoogleSheets = async function() {
+  NVC.Api.getActiveNoticesFromGoogleSheets = async function () {
     if (!cfg || !cfg.ENABLED) {
       const stateObj = window.state || (NVC.State && NVC.State.state) || {};
       const activeNotices = (stateObj.notices || []).filter(n => n.status === 'active');
@@ -711,7 +802,7 @@
     }
   };
 
-  NVC.Api.updateNoticeInGoogleSheets = async function(noticeId, updateData) {
+  NVC.Api.updateNoticeInGoogleSheets = async function (noticeId, updateData) {
     const stateObj = window.state || (NVC.State && NVC.State.state) || {};
     if (!cfg || !cfg.ENABLED || stateObj.useLocalData) {
       const index = (stateObj.notices || []).findIndex(n => n.id === noticeId);
@@ -722,7 +813,7 @@
           } else {
             stateObj.notices[index] = { ...stateObj.notices[index], ...updateData };
           }
-        } catch(e){}
+        } catch (e) { }
         return { success: true, message: 'Notice updated locally' };
       }
       return { success: false, message: 'Notice not found' };
@@ -734,7 +825,7 @@
         status: updateData.status,
         updatedBy: stateObj.currentUser?.name
       };
-      
+
       const result = await NVC.Api.postToGoogleSheets('updateNotice', payload);
       if (result && result.success) {
         const index = (stateObj.notices || []).findIndex(n => n.id === noticeId);
@@ -745,7 +836,7 @@
             } else {
               stateObj.notices[index] = { ...stateObj.notices[index], ...updateData };
             }
-          } catch(e){}
+          } catch (e) { }
         }
       }
       return result;
@@ -755,7 +846,7 @@
     }
   };
 
-  NVC.Api.deleteNoticeFromGoogleSheets = async function(noticeId) {
+  NVC.Api.deleteNoticeFromGoogleSheets = async function (noticeId) {
     const stateObj = window.state || (NVC.State && NVC.State.state) || {};
     if (!cfg || !cfg.ENABLED || stateObj.useLocalData) {
       const index = (stateObj.notices || []).findIndex(n => n.id === noticeId);
@@ -766,7 +857,7 @@
           } else {
             stateObj.notices.splice(index, 1);
           }
-        } catch(e){}
+        } catch (e) { }
         return { success: true, message: 'Notice deleted locally' };
       }
       return { success: false, message: 'Notice not found' };
@@ -777,7 +868,7 @@
         id: noticeId,
         deletedBy: stateObj.currentUser?.name
       };
-      
+
       const result = await NVC.Api.postToGoogleSheets('deleteNotice', payload);
       if (result && result.success) {
         const index = (stateObj.notices || []).findIndex(n => n.id === noticeId);
@@ -788,7 +879,7 @@
             } else {
               stateObj.notices.splice(index, 1);
             }
-          } catch(e){}
+          } catch (e) { }
         }
       }
       return result;
@@ -801,7 +892,7 @@
   // ==================== LABORATORY TESTING API FUNCTIONS ====================
 
   // Save laboratory test data
-  NVC.Api.saveLaboratoryTestToGoogleSheets = async function(testData) {
+  NVC.Api.saveLaboratoryTestToGoogleSheets = async function (testData) {
     const stateObj = window.state || (NVC.State && NVC.State.state) || {};
     if (!cfg || !cfg.ENABLED || stateObj.useLocalData || testData?.useLocal) {
       const newTest = {
@@ -820,7 +911,7 @@
         createdBy: stateObj.currentUser?.name || '',
         createdAt: new Date().toISOString()
       };
-      
+
       try {
         if (NVC.State && typeof NVC.State.push === 'function') {
           NVC.State.push('laboratoryTests', newTest);
@@ -828,7 +919,7 @@
           stateObj.laboratoryTests = stateObj.laboratoryTests || [];
           stateObj.laboratoryTests.unshift(newTest);
         }
-      } catch (e) {}
+      } catch (e) { }
       return { success: true, message: 'Laboratory test saved locally', id: newTest.id };
     }
 
@@ -848,7 +939,7 @@
         remarks: testData.remarks,
         createdBy: stateObj.currentUser?.name
       };
-      
+
       const result = await NVC.Api.postToGoogleSheets('saveLaboratoryTest', payload);
 
       if (result && result.success) {
@@ -866,7 +957,7 @@
           testResult: testData.testResult,
           remarks: testData.remarks
         };
-        
+
         try {
           if (NVC.State && typeof NVC.State.push === 'function') {
             NVC.State.push('laboratoryTests', newTest);
@@ -874,7 +965,7 @@
             stateObj.laboratoryTests = stateObj.laboratoryTests || [];
             stateObj.laboratoryTests.unshift(newTest);
           }
-        } catch(e) {}
+        } catch (e) { }
         return result;
       }
 
@@ -891,7 +982,7 @@
   };
 
   // Get laboratory tests from Google Sheets
-  NVC.Api.getLaboratoryTestsFromGoogleSheets = async function() {
+  NVC.Api.getLaboratoryTestsFromGoogleSheets = async function () {
     if (!cfg || !cfg.ENABLED) {
       const stateObj = window.state || (NVC.State && NVC.State.state) || {};
       return { success: true, data: stateObj.laboratoryTests || [] };
@@ -912,20 +1003,20 @@
   };
 
   // Update laboratory test in Google Sheets
-  NVC.Api.updateLaboratoryTestInGoogleSheets = async function(testId, updateData) {
+  NVC.Api.updateLaboratoryTestInGoogleSheets = async function (testId, updateData) {
     const stateObj = window.state || (NVC.State && NVC.State.state) || {};
     if (!cfg || !cfg.ENABLED || stateObj.useLocalData) {
       const index = (stateObj.laboratoryTests || []).findIndex(t => t.id === testId);
       if (index !== -1) {
         try {
           if (NVC.State && typeof NVC.State.set === 'function') {
-            const arr = stateObj.laboratoryTests.slice(); 
-            arr[index] = { ...arr[index], ...updateData }; 
+            const arr = stateObj.laboratoryTests.slice();
+            arr[index] = { ...arr[index], ...updateData };
             NVC.State.set('laboratoryTests', arr);
           } else {
             stateObj.laboratoryTests[index] = { ...stateObj.laboratoryTests[index], ...updateData };
           }
-        } catch(e) {}
+        } catch (e) { }
         return { success: true, message: 'Laboratory test updated locally' };
       }
       return { success: false, message: 'Laboratory test not found' };
@@ -947,20 +1038,20 @@
         remarks: updateData.remarks,
         updatedBy: stateObj.currentUser?.name
       };
-      
+
       const result = await NVC.Api.postToGoogleSheets('updateLaboratoryTest', payload);
       if (result && result.success) {
         const index = (stateObj.laboratoryTests || []).findIndex(t => t.id === testId);
         if (index !== -1) {
           try {
             if (NVC.State && typeof NVC.State.set === 'function') {
-              const arr = stateObj.laboratoryTests.slice(); 
-              arr[index] = { ...arr[index], ...updateData }; 
+              const arr = stateObj.laboratoryTests.slice();
+              arr[index] = { ...arr[index], ...updateData };
               NVC.State.set('laboratoryTests', arr);
             } else {
               stateObj.laboratoryTests[index] = { ...stateObj.laboratoryTests[index], ...updateData };
             }
-          } catch(e) {}
+          } catch (e) { }
         }
       }
       return result;
@@ -971,20 +1062,20 @@
   };
 
   // Delete laboratory test from Google Sheets
-  NVC.Api.deleteLaboratoryTestFromGoogleSheets = async function(testId) {
+  NVC.Api.deleteLaboratoryTestFromGoogleSheets = async function (testId) {
     const stateObj = window.state || (NVC.State && NVC.State.state) || {};
     if (!cfg || !cfg.ENABLED || stateObj.useLocalData) {
       const index = (stateObj.laboratoryTests || []).findIndex(t => t.id === testId);
       if (index !== -1) {
         try {
           if (NVC.State && typeof NVC.State.set === 'function') {
-            const arr = stateObj.laboratoryTests.slice(); 
-            arr.splice(index, 1); 
+            const arr = stateObj.laboratoryTests.slice();
+            arr.splice(index, 1);
             NVC.State.set('laboratoryTests', arr);
           } else {
             stateObj.laboratoryTests.splice(index, 1);
           }
-        } catch(e) {}
+        } catch (e) { }
         return { success: true, message: 'Laboratory test deleted locally' };
       }
       return { success: false, message: 'Laboratory test not found' };
@@ -995,20 +1086,20 @@
         id: testId,
         deletedBy: stateObj.currentUser?.name
       };
-      
+
       const result = await NVC.Api.postToGoogleSheets('deleteLaboratoryTest', payload);
       if (result && result.success) {
         const index = (stateObj.laboratoryTests || []).findIndex(t => t.id === testId);
         if (index !== -1) {
           try {
             if (NVC.State && typeof NVC.State.set === 'function') {
-              const arr = stateObj.laboratoryTests.slice(); 
-              arr.splice(index, 1); 
+              const arr = stateObj.laboratoryTests.slice();
+              arr.splice(index, 1);
               NVC.State.set('laboratoryTests', arr);
             } else {
               stateObj.laboratoryTests.splice(index, 1);
             }
-          } catch(e) {}
+          } catch (e) { }
         }
       }
       return result;

@@ -2489,6 +2489,25 @@
             border-radius: 4px;
         }
 
+        /* नयाँ उजुरी फारम: AI सुझाव क्षेत्र — तीन col-md-4, उचाइ कम */
+        #aiSuggestionContent.nvc-ai-suggestion-compact {
+            max-height: 260px;
+            overflow-y: auto;
+            margin-bottom: 8px !important;
+        }
+        #aiSuggestionContent.nvc-ai-suggestion-compact .nvc-ai-suggestion-header {
+            line-height: 1.2;
+        }
+        #aiSuggestionContent.nvc-ai-suggestion-compact .nvc-ai-mini-card {
+            font-size: 0.85rem;
+        }
+        #aiSuggestionContent.nvc-ai-suggestion-compact .nvc-ai-mini-card .card-body {
+            min-height: 0;
+        }
+        #aiSuggestionContent.nvc-ai-suggestion-compact .badge {
+            font-size: 0.7rem;
+        }
+
         .chatbot-toggler {
             position: fixed;
             bottom: 20px;
