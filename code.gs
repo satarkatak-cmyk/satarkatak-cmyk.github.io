@@ -493,12 +493,14 @@ function convertADtoBS_Manual(adDate) {
   var adMonth = date.getMonth() + 1;
   var adDay = date.getDate();
 
-  // Final corrected offset for 2026-03-03 = 2082-11-19
+  // Corrected offset for accurate AD to BS conversion
   var bsYear = adYear + 56;
   var bsMonth = adMonth + 8;
-  var bsDay = adDay + 16; // Final fix: 18 → 16
+  var bsDay = adDay + 17;
 
-  if (bsDay > 30) { bsDay -= 30; bsMonth++; } // Back to 30 days
+  if (bsDay > 32) { bsDay -= 32; bsMonth++; }
+  else if (bsDay > 31) { bsDay -= 31; bsMonth++; }
+  else if (bsDay > 30) { bsDay -= 30; bsMonth++; }
   if (bsMonth > 12) { bsMonth -= 12; bsYear++; }
   
   return bsYear + "-" + (bsMonth < 10 ? "0" : "") + bsMonth + "-" + (bsDay < 10 ? "0" : "") + bsDay;

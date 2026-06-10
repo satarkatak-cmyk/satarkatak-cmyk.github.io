@@ -234,6 +234,48 @@ const LAWS_AND_REGULATIONS = [
   }
 ];
 
+function nvcGetLocalSuggestedLaws(description, limit) {
+  limit = limit || 5;
+  const text = String(description || '');
+  if (window.NVC && NVC.Laws && typeof NVC.Laws.suggestFromComplaint === 'function') {
+    return NVC.Laws.suggestFromComplaint(text, limit);
+  }
+  const lowerText = text.toLowerCase();
+  const suggestedLaws = [];
+  if (typeof LAWS_AND_REGULATIONS !== 'undefined' && Array.isArray(LAWS_AND_REGULATIONS)) {
+    LAWS_AND_REGULATIONS.forEach((law) => {
+      let matchScore = 0;
+      law.keywords.forEach((keyword) => {
+        if (lowerText.includes(keyword.toLowerCase())) matchScore++;
+      });
+      if (matchScore > 0) {
+        suggestedLaws.push({ name: law.name, score: matchScore, description: law.description });
+      }
+    });
+    suggestedLaws.sort((a, b) => b.score - a.score);
+  }
+  return suggestedLaws.slice(0, limit);
+}
+
+function nvcMergeSuggestedLaws(aiLaws, localLaws, limit) {
+  limit = limit || 5;
+  if (window.NVC && NVC.Laws && typeof NVC.Laws.mergeSuggestedLaws === 'function') {
+    return NVC.Laws.mergeSuggestedLaws(aiLaws, localLaws, limit);
+  }
+  const out = [];
+  const seen = new Set();
+  function push(item) {
+    if (!item || !item.name) return;
+    const key = String(item.name).trim();
+    if (seen.has(key)) return;
+    seen.add(key);
+    out.push({ name: key, description: item.description || '' });
+  }
+  (Array.isArray(aiLaws) ? aiLaws : []).forEach(push);
+  (Array.isArray(localLaws) ? localLaws : []).forEach(push);
+  return out.slice(0, limit);
+}
+
 // AI System for complaint analysis
 const AI_SYSTEM = {
   // Structured keywords for better classification
@@ -252,26 +294,7 @@ const AI_SYSTEM = {
     // Primary behaviour: use configured AI gateway (Gemini) asynchronously while returning
     // a fast local fallback so existing synchronous callers keep working.
 
-    const lowerText = String(description || '').toLowerCase(); // For keyword matching
-
-    // --- Law Suggestion Logic (Local Rule-Based) ---
-    const suggestedLaws = [];
-    if (typeof LAWS_AND_REGULATIONS !== 'undefined' && Array.isArray(LAWS_AND_REGULATIONS)) {
-      LAWS_AND_REGULATIONS.forEach(law => {
-        let matchScore = 0;
-        law.keywords.forEach(keyword => {
-          if (lowerText.includes(keyword.toLowerCase())) {
-            matchScore++;
-          }
-        });
-        if (matchScore > 0) {
-          suggestedLaws.push({ name: law.name, score: matchScore, description: law.description });
-        }
-      });
-      // Sort by score and take top 3
-      suggestedLaws.sort((a, b) => b.score - a.score);
-    }
-    // --- End Law Suggestion Logic ---
+    const suggestedLaws = nvcGetLocalSuggestedLaws(description, 5);
 
     const text = String(description || '');
 
@@ -285,8 +308,7 @@ const AI_SYSTEM = {
         if (window.NVC && NVC.Api && typeof NVC.Api.analyzeWithGemini === 'function') {
           const res = await NVC.Api.analyzeWithGemini(text);
           if (res && res.success !== false) {
-            // Add suggested laws to the AI result
-            res.suggestedLaws = suggestedLaws.slice(0, 3); // Limit to top 3
+            res.suggestedLaws = nvcMergeSuggestedLaws(res.suggestedLaws, suggestedLaws, 5);
             // Normalize store shape for quick access
             const normalized = (typeof res === 'object') ? res : { result: res };
             window._nvc_ai_cache[text] = normalized;
@@ -323,7 +345,7 @@ const AI_SYSTEM = {
           }
           committeeDecision += lawSuffix;
 
-          return { classification, priority, source: 'fallback', suggestedLaws: suggestedLaws.slice(0, 3), investigationProcedure, committeeDecision };
+          return { classification, priority, source: 'fallback', suggestedLaws: suggestedLaws.slice(0, 5), investigationProcedure, committeeDecision };
         })(text);
         window._nvc_ai_cache[text] = fallback;
         try { document.dispatchEvent(new CustomEvent('nvc.ai.analysis.updated', { detail: { text, result: fallback } })); } catch (e) { }
@@ -331,7 +353,7 @@ const AI_SYSTEM = {
     })();
 
     // Immediate return: conservative fallback (keeps UI synchronous) and includes suggested laws
-    return { classification: 'अन्य', priority: 'न्यून', source: 'pending_ai', suggestedLaws: suggestedLaws.slice(0, 3), investigationProcedure: 'AI विश्लेषण भइरहेको छ...', committeeDecision: 'AI विश्लेषण भइरहेको छ...' };
+    return { classification: 'अन्य', priority: 'न्यून', source: 'pending_ai', suggestedLaws: suggestedLaws.slice(0, 5), investigationProcedure: 'AI विश्लेषण भइरहेको छ...', committeeDecision: 'AI विश्लेषण भइरहेको छ...' };
   },
 
   // Wrapper: call the configured gateway via NVC.Api.analyzeWithGemini
@@ -1770,6 +1792,20 @@ function getCurrentNepaliDate() {
   }
 }
 
+// Robust AD to BS conversion using NepaliCalendar API
+function convertADtoBS(adDateStr) {
+  try {
+    if (window.NepaliCalendar && typeof window.NepaliCalendar.convertADtoBS === 'function') {
+      return window.NepaliCalendar.convertADtoBS(adDateStr);
+    }
+  } catch (e) {
+    console.warn('NepaliCalendar.convertADtoBS failed, using local fallback');
+  }
+
+  // Fallback to local accurate conversion
+  return convertADtoBSAccurate(adDateStr);
+}
+
 // Format a Nepali display string matching homepage (e.g. "2080 बैशाख १५, सोमबार")
 function formatNepaliDisplay(inputDate) {
   try {
@@ -2053,21 +2089,15 @@ function getComplaintAgeClass(complaint) {
 async function updateNepaliDate() {
   const nepaliDateElement = document.getElementById('currentNepaliDate');
   if (!nepaliDateElement) return;
-  // Use centralized converter that tries libraries then fallback heuristic
+  // Use robust NepaliCalendar API conversion
   try {
-    const today = new Date();
-    const year = today.getFullYear();
-    const month = String(today.getMonth() + 1).padStart(2, '0');
-    const day = String(today.getDate()).padStart(2, '0');
-    const adDateStr = `${year}-${month}-${day}`;
-
-    const bsDateStr = convertADtoBS(adDateStr);
+    const bsDateStr = getCurrentNepaliDate();
     if (bsDateStr) {
       const [bsYear, bsMonth, bsDay] = bsDateStr.split('-');
       const nepaliMonths = ["बैशाख", "जेठ", "असार", "साउन", "भदौ", "असोज", "कार्तिक", "मंसिर", "पुष", "माघ", "फागुन", "चैत"];
       const weekdays = ["आइतबार", "सोमबार", "मंगलबार", "बुधबार", "बिहीबार", "शुक्रबार", "शनिबार"];
       const monthName = nepaliMonths[Number(bsMonth) - 1] || "बैशाख";
-      const dayName = weekdays[today.getDay()];
+      const dayName = weekdays[new Date().getDay()];
       nepaliDateElement.textContent = _latinToDevnagari(`${bsYear} ${monthName} ${Number(bsDay)}, ${dayName}`);
       return;
     }
@@ -2084,8 +2114,8 @@ async function updateNepaliDate() {
 function getFallbackNepaliDate() {
   const now = new Date();
 
-  // 2025-02-16 (AD) = 2081-11-03 (BS) - फागुन ३, २०८१
-  // यो लगभग सही छ, तर पूर्ण सटीक छैन
+  // 2026-06-01 (AD) = 2083-02-18 (BS) - जेठ १८, २०८३
+  // Updated reference date for accurate calculation
 
   // महिनाको दिन संख्या (बैशाख देखि चैत सम्म)
   const monthDays = [31, 31, 32, 31, 31, 31, 30, 29, 30, 29, 30, 30];
@@ -2094,9 +2124,9 @@ function getFallbackNepaliDate() {
   const weekdays = ["आइतबार", "सोमबार", "मंगलबार", "बुधबार",
     "बिहीबार", "शुक्रबार", "शनिबार"];
 
-  // Reference date: 2025-02-16 = 2081-11-03
-  const refAD = new Date(2025, 1, 16); // month is 0-indexed: 1 = February
-  const refBS = { year: 2081, month: 11, day: 3 }; // month 11 = फागुन
+  // Reference date: 2026-06-01 = 2083-02-18
+  const refAD = new Date(2026, 5, 1); // month is 0-indexed: 5 = June
+  const refBS = { year: 2083, month: 2, day: 18 }; // month 2 = जेठ
 
   // दिनको अन्तर निकाल्ने
   const diffTime = now - refAD;
@@ -2171,12 +2201,14 @@ function convertADtoBSAccurate(adDateStr) {
         const adMonth = parts[1];
         const adDay = parts[2];
 
-        // Backend formula (same as code.gs convertADtoBS_Manual): +16 on day offset
+        // Corrected formula for accurate AD to BS conversion
         let bsYear = adYear + 56;
         let bsMonth = adMonth + 8;
-        let bsDay = adDay + 16;
+        let bsDay = adDay + 17;
 
-        if (bsDay > 30) { bsDay -= 30; bsMonth++; }
+        if (bsDay > 32) { bsDay -= 32; bsMonth++; }
+        else if (bsDay > 31) { bsDay -= 31; bsMonth++; }
+        else if (bsDay > 30) { bsDay -= 30; bsMonth++; }
         if (bsMonth > 12) { bsMonth -= 12; bsYear++; }
 
         return `${bsYear}-${String(bsMonth).padStart(2, '0')}-${String(bsDay).padStart(2, '0')}`;
@@ -8881,11 +8913,25 @@ function initializeDashboardCharts() {
       }
 
       chartComplaints.forEach(c => {
-        const analysis = AI_SYSTEM.analyzeComplaint(c.description || '');
+        const desc = c.description || c['उजुरीको संक्षिप्त विवरण'] || c['कैफियत'] || '';
+        const analysis = AI_SYSTEM.analyzeComplaint(desc);
         const cls = analysis.classification || 'अन्य';
         if (classStats[cls] !== undefined) classStats[cls]++;
         else classStats['अन्य']++;
       });
+
+      // Update the HTML table to sync with the chart's correctly cached data
+      const tableBody = document.getElementById('classificationTableBody');
+      if (tableBody) {
+        tableBody.innerHTML = Object.entries(classStats).map(([key, value]) => `
+          <tr>
+              <td>${key}</td>
+              <td class="text-end">
+                  <span class="badge bg-primary rounded-pill" style="min-width: 30px; font-size: 0.8rem;">${value}</span>
+              </td>
+          </tr>
+        `).join('');
+      }
 
       window.nvcChartsData.classificationChart = {
         labels: Object.keys(classStats),
@@ -9828,14 +9874,20 @@ function generateClassificationTableHTML(complaints) {
   };
 
   complaints.forEach(c => {
-    const analysis = AI_SYSTEM.analyzeComplaint(c.description || '');
+    const desc = c.description || c['उजुरीको संक्षिप्त विवरण'] || c['कैफियत'] || '';
+    const analysis = AI_SYSTEM.analyzeComplaint(desc);
     const cls = analysis.classification || 'अन्य';
     if (stats[cls] !== undefined) stats[cls]++;
     else stats['अन्य'] = (stats['अन्य'] || 0) + 1;
   });
 
   const rows = Object.entries(stats).map(([key, value]) => `
-        <tr><td>${key}</td><td class="text-end">${value}</td></tr>
+        <tr>
+            <td>${key}</td>
+            <td class="text-end">
+                <span class="badge bg-primary rounded-pill" style="min-width: 30px; font-size: 0.8rem;">${value}</span>
+            </td>
+        </tr>
     `).join('');
 
   return `
@@ -9844,7 +9896,7 @@ function generateClassificationTableHTML(complaints) {
                 <thead class="table-light">
                     <tr><th>वर्गीकरण (विषय)</th><th class="text-end">संख्या</th></tr>
                 </thead>
-                <tbody>${rows}</tbody>
+                <tbody id="classificationTableBody">${rows}</tbody>
             </table>
         </div>
     `;
@@ -10916,11 +10968,13 @@ function showShakhaDashboard() {
       <div class="stat-widget pointer" onclick="showAllComplaintsView()"><div class="stat-icon bg-primary"><i class="fas fa-file-alt"></i></div><div class="stat-info"><div class="stat-value">${shakhaComplaints.length}</div><div class="stat-label">कूल उजुरीहरू</div><span class="stat-trend trend-up"></span></div></div>
       <div class="stat-widget pointer" onclick="showComplaintsView({status: 'progress'})"><div class="stat-icon bg-info"><i class="fas fa-spinner"></i></div><div class="stat-info"><div class="stat-value">${inProgressComplaints}</div><div class="stat-label">चालु उजुरी</div><span class="stat-trend trend-up"></span></div></div>
       <div class="stat-widget pointer" onclick="showComplaintsView({status: 'pending'})"><div class="stat-icon bg-warning"><i class="fas fa-clock"></i></div><div class="stat-info"><div class="stat-value">${pendingComplaints}</div><div class="stat-label">काम बाँकी</div><span class="stat-trend trend-down"></span></div></div>
-      ${(state.currentUser && (state.currentUser.shakha || '').includes('प्राविधिक')) ? `
+      ${(state.currentUser && ((state.currentUser.shakha || '').includes('प्राविधिक') || ['technical1', 'technical2', 'technical3', 'technical4'].includes((state.currentUser.shakha || '').toLowerCase()))) ? `
+      <div class="stat-widget pointer" onclick="showComplaintsView({status: 'resolved'})"><div class="stat-icon bg-success"><i class="fas fa-check-circle"></i></div><div class="stat-info"><div class="stat-value">${resolvedComplaints}</div><div class="stat-label">फछ्रयौट भएका</div><span class="stat-trend trend-up"></span></div></div>
       <div class="stat-widget pointer" onclick="showTechnicalProjectsView()"><div class="stat-icon bg-success"><i class="fas fa-hard-hat"></i></div><div class="stat-info"><div class="stat-value">${technicalProjects.length}</div><div class="stat-label">प्राविधिक परीक्षण/आयोजना अनुगमन</div><span class="stat-trend trend-up"></span></div></div>
       <div class="stat-widget pointer" onclick="showTechnicalProjectsView({status: 'active'})"><div class="stat-icon bg-secondary"><i class="fas fa-tasks"></i></div><div class="stat-info"><div class="stat-value">${activeProjects}</div><div class="stat-label">चालु आयोजना</div><span class="stat-trend trend-up"></span></div></div>
       <div class="stat-widget pointer" onclick="showTechnicalExaminersView()"><div class="stat-icon bg-warning"><i class="fas fa-user-tie"></i></div><div class="stat-info"><div class="stat-value">${(state.technicalExaminers || []).length}</div><div class="stat-label">प्राविधिक परीक्षक सूची</div><span class="stat-trend trend-up"></span></div></div>
       ` : (state.currentUser && (state.currentUser.shakha === 'LABORATORY_TESTING' || (SHAKHA && SHAKHA[state.currentUser.shakha] === 'प्रयोगशाला परीक्षण शाखा') || (state.currentUser.shakha && String(state.currentUser.shakha).toLowerCase().includes('laboratory')) || (state.currentUser.shakha && String(state.currentUser.shakha).includes('प्रयोगशाला')))) ? `
+      <div class="stat-widget pointer" onclick="showComplaintsView({status: 'resolved'})"><div class="stat-icon bg-success"><i class="fas fa-check-circle"></i></div><div class="stat-info"><div class="stat-value">${resolvedComplaints}</div><div class="stat-label">फछ्रयौट भएका</div><span class="stat-trend trend-up"></span></div></div>
       <div class="stat-widget pointer" onclick="showSampleTestingView()"><div class="stat-icon bg-success"><i class="fas fa-flask"></i></div><div class="stat-info"><div class="stat-value">${totalSampleTests}</div><div class="stat-label">कूल नमूना परीक्षण</div><span class="stat-trend trend-up"></span></div></div>
       <div class="stat-widget pointer" onclick="showSampleTestingView({status: 'progress'})"><div class="stat-icon bg-info"><i class="fas fa-spinner"></i></div><div class="stat-info"><div class="stat-value">${currentSampleTests}</div><div class="stat-label">चालु परीक्षण</div><span class="stat-trend trend-up"></span></div></div>
       <div class="stat-widget pointer" onclick="showSampleTestingView({status: 'completed'})"><div class="stat-icon bg-success"><i class="fas fa-check-circle"></i></div><div class="stat-info"><div class="stat-value">${completedSampleTests}</div><div class="stat-label">सम्पन्न परीक्षण</div><span class="stat-trend trend-up"></span></div></div>
@@ -12947,8 +13001,11 @@ function showNewComplaintView() {
               <div class="list-group list-group-flush border-start border-primary border-2 ps-2 nvc-ai-laws-list">
                 ${analysis.suggestedLaws.map(law => `
                   <div class="mb-0 pb-1">
-                    <span class="fw-bold text-dark small">${law.name}</span>:
-                    <span class="text-muted" style="font-size:0.8rem;">${law.description || ''}</span>
+                    <div class="fw-bold text-primary small" style="font-size:0.85rem;">${law.name}</div>
+                    <div class="text-dark fw-semibold small" style="font-size:0.8rem;">
+                      <i class="fas fa-bookmark text-danger"></i> ${law.section || 'सम्बन्धित प्रावधान'}
+                    </div>
+                    <div class="text-muted" style="font-size:0.78rem; line-height:1.2;">${law.description || ''}</div>
                   </div>
                 `).join('')}
               </div>

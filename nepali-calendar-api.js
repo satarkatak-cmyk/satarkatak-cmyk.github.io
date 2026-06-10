@@ -22,6 +22,16 @@
             2089: [30, 32, 31, 32, 31, 30, 30, 30, 29, 30, 30, 30],
             2090: [30, 32, 31, 32, 31, 30, 30, 30, 29, 30, 30, 30]
         },
+
+        // Reference AD to BS mapping for accurate conversion
+        // These are known accurate reference points
+        referencePoints: [
+            { ad: '2024-04-13', bs: '2081-01-01' }, // Nepali New Year 2081
+            { ad: '2025-04-14', bs: '2082-01-01' }, // Nepali New Year 2082
+            { ad: '2026-04-14', bs: '2083-01-01' }, // Nepali New Year 2083
+            { ad: '2027-04-14', bs: '2084-01-01' }, // Nepali New Year 2084
+            { ad: '2028-04-13', bs: '2085-01-01' }, // Nepali New Year 2085
+        ],
         
         months: [
             "बैशाख", "जेठ", "असार", "साउन", "भदौ", "असोज",
@@ -45,20 +55,101 @@
             const year = today.getFullYear();
             const month = today.getMonth() + 1;
             const day = today.getDate();
-            
-            // Use existing conversion as fallback for initial current date
+            const adDateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+
+            // Use robust reference-based conversion
+            return this.convertADtoBS(adDateStr);
+        },
+
+        /**
+         * Convert AD date to BS date using reference points and actual calendar data
+         * @param {string} adDateStr - AD date in YYYY-MM-DD format
+         * @returns {string} BS date in YYYY-MM-DD format
+         */
+        convertADtoBS: function(adDateStr) {
             try {
-                if (window.convertADtoBSAccurate) {
-                    return window.convertADtoBSAccurate(`${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`);
+                const adDate = new Date(adDateStr);
+                if (isNaN(adDate.getTime())) return '';
+
+                // Find the nearest reference point
+                let nearestRef = null;
+                let minDiff = Infinity;
+
+                for (const ref of NEPALI_CALENDAR.referencePoints) {
+                    const refDate = new Date(ref.ad);
+                    const diff = Math.abs(adDate - refDate);
+                    if (diff < minDiff) {
+                        minDiff = diff;
+                        nearestRef = ref;
+                    }
                 }
+
+                if (!nearestRef) {
+                    // Fallback to simple formula if no reference found
+                    return this.convertADtoBSFallback(adDateStr);
+                }
+
+                // Calculate day difference from reference
+                const refDate = new Date(nearestRef.ad);
+                const diffDays = Math.floor((adDate - refDate) / (1000 * 60 * 60 * 24));
+
+                // Parse reference BS date
+                const [refBsYear, refBsMonth, refBsDay] = nearestRef.bs.split('-').map(Number);
+
+                // Advance through Nepali calendar using actual month data
+                let bsYear = refBsYear;
+                let bsMonth = refBsMonth;
+                let bsDay = refBsDay + diffDays;
+
+                // Adjust for month/year boundaries
+                while (bsDay > this.getDaysInMonth(bsYear, bsMonth)) {
+                    bsDay -= this.getDaysInMonth(bsYear, bsMonth);
+                    bsMonth++;
+                    if (bsMonth > 12) {
+                        bsMonth = 1;
+                        bsYear++;
+                    }
+                }
+
+                // Handle negative day difference (dates before reference)
+                while (bsDay < 1) {
+                    bsMonth--;
+                    if (bsMonth < 1) {
+                        bsMonth = 12;
+                        bsYear--;
+                    }
+                    bsDay += this.getDaysInMonth(bsYear, bsMonth);
+                }
+
+                return `${bsYear}-${String(bsMonth).padStart(2, '0')}-${String(bsDay).padStart(2, '0')}`;
             } catch (e) {
-                console.warn('AD to BS conversion failed, using fallback');
+                console.warn('Robust AD to BS conversion failed, using fallback:', e);
+                return this.convertADtoBSFallback(adDateStr);
             }
-            
-            // Fallback calculation
-            const bsYear = year + 57;
-            const bsMonth = month;
-            const bsDay = day;
+        },
+
+        /**
+         * Fallback AD to BS conversion using simple formula
+         * @param {string} adDateStr - AD date in YYYY-MM-DD format
+         * @returns {string} BS date in YYYY-MM-DD format
+         */
+        convertADtoBSFallback: function(adDateStr) {
+            const parts = adDateStr.split('-').map(Number);
+            if (parts.length !== 3) return '';
+
+            const adYear = parts[0];
+            const adMonth = parts[1];
+            const adDay = parts[2];
+
+            let bsYear = adYear + 56;
+            let bsMonth = adMonth + 8;
+            let bsDay = adDay + 17;
+
+            if (bsDay > 32) { bsDay -= 32; bsMonth++; }
+            else if (bsDay > 31) { bsDay -= 31; bsMonth++; }
+            else if (bsDay > 30) { bsDay -= 30; bsMonth++; }
+            if (bsMonth > 12) { bsMonth -= 12; bsYear++; }
+
             return `${bsYear}-${String(bsMonth).padStart(2, '0')}-${String(bsDay).padStart(2, '0')}`;
         },
 
